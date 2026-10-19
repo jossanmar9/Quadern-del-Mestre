@@ -1,0 +1,33 @@
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <img class="logo" src="__LOGO__" alt="" width="60" height="60">
+      <div class="brand-txt">
+        <span class="eyebrow" data-i18n="Quadern del Mestre">Quadern del Mestre</span>
+        <input id="camp-name" data-i18n-ph="Nom de la partida" aria-label="Nom de la partida" placeholder="Nom de la partida" maxlength="80">
+      </div>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist" data-i18n-aria="Seccions" aria-label="Seccions"></nav>
+    <div class="who" id="who"></div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <main id="main"><div class="empty"><b data-i18n="Obrint el quadern…">Obrint el quadern…</b><span data-i18n="Connectant amb el servidor.">Connectant amb el servidor.</span></div></main>
+  <aside class="dice" id="dice" data-i18n-aria="Daus" aria-label="Daus">
+    <div class="row" style="justify-content:space-between"><h2 data-i18n="Daus">Daus</h2><button class="btn sm dice-close" id="dice-close" data-i18n="Tancar">Tancar</button></div>
+    <div class="dice-btns">
+      <button class="die" data-die="1d4">d4</button><button class="die" data-die="1d6">d6</button><button class="die" data-die="1d8">d8</button><button class="die" data-die="1d10">d10</button>
+      <button class="die" data-die="1d12">d12</button><button class="die" data-die="1d100">d100</button><button class="die d20" data-die="1d20" style="grid-column:span 2">d20</button>
+    </div>
+    <div class="seg" role="group" data-i18n-aria="Tirades de d20" aria-label="Tirades de d20">
+      <button data-adv="" aria-pressed="true" data-i18n="Normal">Normal</button><button data-adv="adv" aria-pressed="false" data-i18n="Avantatge">Avantatge</button><button data-adv="dis" aria-pressed="false" data-i18n="Desavantatge">Desavantatge</button>
+    </div>
+    <form id="dice-form"><input class="in mono" id="dice-expr" placeholder="2d6+3" data-i18n-aria="Expressió de daus" aria-label="Expressió de daus" autocomplete="off"><button class="btn pri" type="submit" data-i18n="Tirar">Tirar</button></form>
+    <label class="check" id="secret-wrap" hidden><input type="checkbox" id="dice-secret"> <span data-i18n="Tirada secreta (només la veus tu)">Tirada secreta (només la veus tu)</span></label>
+    <div class="last" id="dice-last"><span class="muted small" data-i18n="Prem un dau, o una habilitat de la fitxa, per a tirar.">Prem un dau, o una habilitat de la fitxa, per a tirar.</span></div>
+    <h3 data-i18n="Tirades de la taula">Tirades de la taula</h3>
+    <ol class="log" id="dice-log"></ol>
+  </aside>
+</div>
+<button class="btn pri dice-fab" id="dice-fab" data-i18n="Daus">Daus</button>
+<div id="modal-root"></div>
+<div class="toast" id="toast" hidden></div>
