@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Construeix quadern.py: ajunta la pàgina web de src/web/, el compendi SRD de src/srd/
-i el codi QR de src/qr.py, i ho incrusta dins del servidor src/servidor.py, perquè
-tot el programa siga un sol fitxer.
+"""Construeix quadern.py: ajunta la pàgina web de src/web/, el compendi SRD de src/srd/,
+el codi QR de src/qr.py i la finestra de src/finestra.py, i ho incrusta dins del servidor
+src/servidor.py, perquè tot el programa siga un sol fitxer.
 
 Ús:  python3 build.py
 """
@@ -46,12 +46,14 @@ def main():
         "</head>\n<body>\n" + page + "\n</body>\n</html>\n"
     )
     server = (ROOT / "src" / "servidor.py").read_text(encoding="utf-8")
-    for mark in ("__PAGE__", "__SRD__", "__QR__"):
+    for mark in ("__PAGE__", "__SRD__", "__QR__", "__FINESTRA__", "__ICONA__"):
         if mark not in server:
             raise SystemExit(f"src/servidor.py no té el marcador {mark}")
     qr = (ROOT / "src" / "qr.py").read_text(encoding="utf-8").strip()
+    finestra = (ROOT / "src" / "finestra.py").read_text(encoding="utf-8").strip()
     out = ROOT / "quadern.py"
-    out.write_text(server.replace("__QR__", qr)
+    out.write_text(server.replace("__QR__", qr).replace("__FINESTRA__", finestra)
+                   .replace("__ICONA__", b64_lines((WEB / "logo.png").read_bytes()))
                    .replace("__PAGE__", b64_lines(gzip.compress(html.encode("utf-8"), 9)))
                    .replace("__SRD__", b64_lines((ROOT / "src" / "srd" / "srd-es.json.gz").read_bytes())),
                    encoding="utf-8")

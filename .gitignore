@@ -10,3 +10,7 @@ __pycache__/
 build/
 dist/
 *.spec
+
+# Web i manuals generats (els fa GitHub)
+_site/
+manuals/

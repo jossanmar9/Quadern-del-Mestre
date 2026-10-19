@@ -18,7 +18,7 @@
 # Commons Reconeixement 4.0 Internacional (https://creativecommons.org/licenses/by/4.0/legalcode).
 # Projecte de fans no oficial, sense relació amb Wizards of the Coast.
 """
-Quadern del Mestre (versió 1.0) — servidor local per a portar partides de rol.
+Quadern del Mestre (versió 1.1) — servidor local per a portar partides de rol.
 
 Tot va en aquest únic fitxer: el servidor, la pàgina web i el compendi SRD 5.2.1.
 Un ordinador l'executa i la resta s'hi connecta des del navegador.
@@ -27,9 +27,13 @@ Un ordinador l'executa i la resta s'hi connecta des del navegador.
     python3 quadern.py
     python3 quadern.py --contrasenya drac
     python3 quadern.py --partida "La cripta" --port 9002
+    python3 quadern.py --sense-finestra        (només la terminal)
+    python3 quadern.py --dades CARPETA          (on es guarden les partides)
 
-En arrancar mostra la contrasenya del màster i un codi QR per a entrar des del mòbil.
-Cada partida es guarda a partides/<nom>.json, i les imatges a partides/<nom>-fitxers/.
+En arrancar obri una finestreta (i la terminal) amb l'adreça, la contrasenya del màster i un
+codi QR per a entrar des del mòbil.
+Cada partida es guarda a partides/<nom>.json, i les imatges a partides/<nom>-fitxers/. Les dades
+van al costat del programa, o a la carpeta de l'usuari si el programa està instal·lat.
 """
 import argparse
 import base64
@@ -51,12 +55,30 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.0"
+VERSION = "1.1"
 FROZEN = getattr(sys, "frozen", False)          # executable de Windows fet amb PyInstaller
 DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent
-CAMP_DIR = DIR / "partides"
-TRASH_DIR = CAMP_DIR / "esborrades"
-META = DIR / "quadern.json"     # sessions, noms, partida oberta i contrasenya del màster
+INSTALLAT = (DIR / "installat").exists()       # el posen l'instal·lador de Windows i el paquet .deb
+
+
+def user_data_dir():
+    """La carpeta de dades de l'usuari, per a quan el programa està instal·lat."""
+    if os.name == "nt":
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "QuadernDelMestre"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Quadern del Mestre"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "quadern-del-mestre"
+
+
+def set_data_dir(path):
+    global DATA_DIR, CAMP_DIR, TRASH_DIR, META
+    DATA_DIR = Path(path).expanduser().resolve()
+    CAMP_DIR = DATA_DIR / "partides"
+    TRASH_DIR = CAMP_DIR / "esborrades"
+    META = DATA_DIR / "quadern.json"     # sessions, noms, partida oberta i contrasenya del màster
+
+
+set_data_dir(user_data_dir() if INSTALLAT else DIR)
 MAX_UPLOAD = 20 * 1024 * 1024
 IMG_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}
 WORDS = ("drac", "mag", "elf", "nan", "orc", "runa", "espasa", "torre", "llop", "corb", "foc", "gel",
@@ -179,7 +201,7 @@ def new_campaign(name):
 
 
 def load(wanted=None, password=None):
-    CAMP_DIR.mkdir(exist_ok=True)
+    CAMP_DIR.mkdir(parents=True, exist_ok=True)
     if META.exists():
         try:
             meta = read_json(META)
@@ -438,6 +460,9 @@ def broadcast_event(kind, payload, dm_only=False):
 
 # ---------------------------------------------------------------- QR (sense dependències)
 __QR__
+
+
+__FINESTRA__
 
 
 def lan_addresses():
@@ -791,6 +816,9 @@ class Server(ThreadingHTTPServer):
 
 
 def main():
+    for name in ("stdout", "stderr"):  # l'executable de Windows no té terminal
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
     for stream in (sys.stdout, sys.stderr):  # les consoles de Windows potser no parlen UTF-8
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -803,27 +831,42 @@ def main():
     ap.add_argument("--contrasenya", default=os.environ.get("QUADERN_CONTRASENYA", ""),
                     help="contrasenya del màster (si no, se'n fa una i es recorda)")
     ap.add_argument("--partida", default="", help="nom de la partida que s'obri en arrancar (la crea si no existeix)")
-    ap.add_argument("--sense-qr", action="store_true", help="no mostra el codi QR en arrancar")
-    ap.add_argument("--sense-navegador", action="store_true", help="(.exe) no obri el navegador en arrancar")
+    ap.add_argument("--dades", default=os.environ.get("QUADERN_DADES", ""),
+                    help="carpeta on es guarden les partides (per defecte, al costat del programa, "
+                         "o a la carpeta de l'usuari si està instal·lat)")
+    ap.add_argument("--sense-finestra", action="store_true", help="no obri la finestra: només la terminal")
+    ap.add_argument("--sense-navegador", action="store_true", help="no obri el navegador en arrancar")
+    ap.add_argument("--sense-qr", action="store_true", help="no mostra el codi QR a la terminal")
+    ap.add_argument("--idioma", choices=("ca", "es"), help="idioma de la finestra (per defecte, el del sistema)")
     a = ap.parse_args()
+    if a.dades.strip():
+        set_data_dir(a.dades.strip())
+    amb_finestra = not a.sense_finestra and hi_ha_finestra()
+    idioma = a.idioma or idioma_sistema()
     state["port"] = a.port
     try:
         srv = Server(("0.0.0.0", a.port), Handler)
     except OSError:
         print(f"\n  El port {a.port} ja està en ús: hi ha un altre programa (potser el Quadern ja obert) escoltant-hi.\n"
               f"  Tanca'l, o arranca en un altre port:   python3 quadern.py --port 9002\n")
-        if FROZEN:
-            input("  Prem Intro per a tancar.")
+        if amb_finestra:
+            T = FINESTRA_TEXTOS[idioma]
+            avis_finestra(T["port_t"], T["port_q"].format(p=a.port))
         sys.exit(1)
     load(a.partida.strip() or None, a.contrasenya.strip() or None)
     threading.Thread(target=saver, daemon=True).start()
+    try:  # en apagar l'ordinador o tancar la sessió (Linux), es guarda igual que amb Ctrl+C
+        import signal
+        signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
+    except Exception:  # noqa: BLE001
+        pass
     print(f"\n  Quadern del Mestre (versió {VERSION}) en marxa.\n")
     print(f"  En aquest ordinador:   http://localhost:{a.port}")
     urls = lan_urls()
     for u in urls:
         print(f"  Des de la xarxa:       {u}")
     print(f"\n  Contrasenya del màster: {state['password']}")
-    if urls and not a.sense_qr:
+    if urls and not a.sense_qr and not amb_finestra:
         print("\n  Escaneja aquest codi amb el mòbil per a entrar:\n")
         try:
             print(qr_terminal(urls[0]))
@@ -832,11 +875,17 @@ def main():
     print()
     print(f"  Partida oberta:         {camp_name(state['docs'], state['active'])}")
     print(f"  Partides guardades a:   {CAMP_DIR}")
-    print("\n  Prem Ctrl+C per a aturar-lo" + (" o tanca aquesta finestra" if FROZEN else "") + ".\n")
-    if FROZEN and not a.sense_navegador:
-        threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{a.port}")).start()
     try:
-        srv.serve_forever()
+        if amb_finestra:
+            print("\n  Tanca la finestra del Quadern per a aturar-lo.\n")
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            finestra(srv, a.port, idioma, obrir_navegador=not a.sense_navegador)
+            srv.shutdown()
+        else:
+            print("\n  Prem Ctrl+C per a aturar-lo" + (" o tanca aquesta finestra" if os.name == "nt" else "") + ".\n")
+            if FROZEN and not a.sense_navegador:
+                threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{a.port}")).start()
+            srv.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
@@ -851,6 +900,9 @@ __PAGE__
 SRD_GZ = base64.b64decode("""
 __SRD__
 """)
+ICONA_PNG = "".join("""
+__ICONA__
+""".split())
 
 if __name__ == "__main__":
     main()

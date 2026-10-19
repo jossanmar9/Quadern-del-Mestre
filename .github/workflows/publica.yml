@@ -1,0 +1,219 @@
+# Construeix el Quadern del Mestre per a Windows i Linux, fa els manuals en PDF i ho publica tot
+# com a «release» quan es puja una etiqueta v* (per exemple v1.1).
+# També es pot llançar a mà des de la pestanya Actions («Run workflow»): fa els paquets de prova,
+# que es poden baixar des del resum de l'execució, però no publica res.
+name: Publica
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  proves:
+    runs-on: ubuntu-latest
+    outputs:
+      versio: ${{ steps.versio.outputs.versio }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Versió
+        id: versio
+        run: |
+          codi=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' src/servidor.py)
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            v="${GITHUB_REF_NAME#v}"
+            if [ "$v" != "$codi" ]; then
+              echo "::error::L'etiqueta és $GITHUB_REF_NAME però src/servidor.py diu VERSION = \"$codi\". Canvia'l i torna a etiquetar."
+              exit 1
+            fi
+          else
+            v="$codi"
+          fi
+          echo "versio=$v" >> "$GITHUB_OUTPUT"
+          echo "Versió: $v"
+
+      - name: Genera quadern.py i comprova les traduccions
+        run: |
+          python build.py
+          python eines/comprova-traduccions.py
+
+      - name: Prova que arranca
+        run: |
+          python quadern.py --sense-finestra --sense-navegador --sense-qr --dades "$RUNNER_TEMP/dades" --port 8799 & PID=$!
+          sleep 3
+          curl -fsS http://127.0.0.1:8799/api/hello
+          curl -fsS -o /dev/null http://127.0.0.1:8799/api/srd
+          curl -fsS --compressed http://127.0.0.1:8799/ | grep "Quadern del Mestre" > /dev/null
+          kill $PID
+          sleep 1
+          test -f "$RUNNER_TEMP/dades/quadern.json"
+
+  manuals:
+    needs: proves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Fa els manuals en PDF
+        env:
+          QUADERN_VERSIO: ${{ needs.proves.outputs.versio }}
+        run: sh eines/manuals-pdf.sh dist/manuals
+      - uses: actions/upload-artifact@v6
+        with:
+          name: manuals
+          path: dist/manuals/*.pdf
+
+  windows:
+    needs: [proves, manuals]
+    runs-on: windows-latest
+    env:
+      VERSIO: ${{ needs.proves.outputs.versio }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v7
+        with:
+          name: manuals
+          path: manuals
+
+      - name: Fa l'executable
+        run: |
+          python -m pip install --upgrade pip pyinstaller
+          python build.py
+          pyinstaller --noconfirm --onedir --windowed --name QuadernDelMestre --icon logo.ico --hidden-import tkinter quadern.py
+
+      - name: Prova que arranca
+        shell: pwsh
+        run: |
+          $p = Start-Process dist\QuadernDelMestre\QuadernDelMestre.exe -ArgumentList "--sense-finestra","--sense-navegador","--dades","$env:RUNNER_TEMP\dades","--port","8799" -PassThru
+          Start-Sleep -Seconds 8
+          $r = Invoke-WebRequest http://127.0.0.1:8799/api/hello -UseBasicParsing
+          if ($r.StatusCode -ne 200) { throw "El servidor no respon" }
+          $s = Invoke-WebRequest http://127.0.0.1:8799/api/srd -UseBasicParsing
+          if ($s.StatusCode -ne 200) { throw "No carrega el compendi" }
+          Stop-Process -Id $p.Id
+
+      - name: Prepara la versió portable i la de l'instal·lador
+        shell: pwsh
+        run: |
+          $docs = "README.md", "README.es.md", "LICENSE", "NOTICE.md"
+          # Portable: les partides es guarden al costat de l'executable
+          $port = "dist\portable\QuadernDelMestre"
+          New-Item -ItemType Directory "$port\docs" -Force | Out-Null
+          Copy-Item dist\QuadernDelMestre\* $port -Recurse
+          Copy-Item $docs $port
+          Copy-Item manuals\*.pdf "$port\docs"
+          # Instal·lador: el fitxer «installat» fa que les partides vagen a %APPDATA%\QuadernDelMestre
+          $inst = "dist\installador\QuadernDelMestre"
+          New-Item -ItemType Directory "$inst\docs" -Force | Out-Null
+          Copy-Item dist\QuadernDelMestre\* $inst -Recurse
+          Copy-Item $docs $inst
+          Copy-Item manuals\*.pdf "$inst\docs"
+          Set-Content "$inst\installat" "Aquest fitxer indica que el Quadern esta instal·lat: les partides es guarden a %APPDATA%\QuadernDelMestre."
+
+      - name: Crea el zip portable
+        shell: pwsh
+        run: Compress-Archive -Path dist\portable\QuadernDelMestre -DestinationPath "dist\QuadernDelMestre-$env:VERSIO-windows-portable.zip"
+
+      - name: Crea l'instal·lador
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc /Q "/DVersio=$env:VERSIO" "/DOrigen=$PWD\dist\installador\QuadernDelMestre" paquets\windows\quadern.iss
+          if ($LASTEXITCODE -ne 0) { throw "Error creant l'instal·lador" }
+          Get-ChildItem dist\*.exe, dist\*.zip
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows
+          path: |
+            dist/*.zip
+            dist/*.exe
+
+  linux:
+    needs: [proves, manuals]
+    runs-on: ubuntu-latest
+    env:
+      VERSIO: ${{ needs.proves.outputs.versio }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: manuals
+          path: manuals
+
+      - name: Fa el .deb i el .tar.gz
+        run: |
+          python3 build.py
+          python3 eines/paquet-linux.py --versio "$VERSIO" --pdf manuals
+          dpkg-deb --info dist/*.deb
+          dpkg-deb --contents dist/*.deb
+
+      - name: Prova el .deb
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ./dist/quadern-del-mestre_${VERSIO}_all.deb
+          quadern-del-mestre --sense-finestra --sense-navegador --sense-qr --port 8799 & PID=$!
+          sleep 3
+          curl -fsS http://127.0.0.1:8799/api/hello
+          kill $PID
+          sleep 1
+          test -f "$HOME/.local/share/quadern-del-mestre/quadern.json"
+          desktop-file-validate /usr/share/applications/quadern-del-mestre.desktop || true
+
+      - name: Prova el .tar.gz
+        run: |
+          mkdir prova && tar xzf dist/QuadernDelMestre-${VERSIO}-linux.tar.gz -C prova
+          cd prova/QuadernDelMestre-${VERSIO}-linux
+          ./quadern-del-mestre.sh --sense-finestra --sense-navegador --sense-qr --port 8798 & PID=$!
+          sleep 3
+          curl -fsS http://127.0.0.1:8798/api/hello
+          kill $PID
+          sleep 1
+          test -f quadern.json
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: linux
+          path: |
+            dist/*.deb
+            dist/*.tar.gz
+
+  publica:
+    if: github.ref_type == 'tag'
+    needs: [proves, manuals, windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publica la versió
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Quadern del Mestre ${{ needs.proves.outputs.versio }}
+          files: dist/*
+          body: |
+            **Quadern del Mestre ${{ needs.proves.outputs.versio }}** — Ajudant lliure per a partides de rol de 5a edició.
+
+            | Sistema | Fitxer |
+            |---|---|
+            | Windows 10/11 (recomanat) | `QuadernDelMestre-${{ needs.proves.outputs.versio }}-installador.exe` — no demana permisos d'administrador |
+            | Windows portable | `QuadernDelMestre-${{ needs.proves.outputs.versio }}-windows-portable.zip` — descomprimeix-lo i obri `QuadernDelMestre.exe` |
+            | Ubuntu, Debian, Linux Mint… | `quadern-del-mestre_${{ needs.proves.outputs.versio }}_all.deb` |
+            | Altres Linux | `QuadernDelMestre-${{ needs.proves.outputs.versio }}-linux.tar.gz` — descomprimeix-lo i obri `quadern-del-mestre.sh` |
+
+            Manuals en PDF (valencià i castellà) adjunts i dins de cada paquet. Instruccions: `guia-installacio.pdf` / `guia-instalacion.pdf`.
+
+            *Ayudante libre para partidas de rol de 5.ª edición, para Windows y Linux. Guía de instalación en castellano: `guia-instalacion.pdf`.*
+          generate_release_notes: true

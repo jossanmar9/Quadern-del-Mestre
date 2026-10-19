@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Quadern del Mestre
+GenericName=Ajudant per a partides de rol
+GenericName[es]=Ayudante para partidas de rol
+Comment=Dirigeix partides de rol de 5a edició a casa, amb tota la taula connectada
+Comment[es]=Dirige partidas de rol de 5.ª edición en casa, con toda la mesa conectada
+Exec=quadern-del-mestre
+Icon=quadern-del-mestre
+Terminal=false
+Categories=Game;RolePlaying;
+Keywords=rol;D&D;màster;mapa;partida;dungeon;
+StartupWMClass=Quadern-del-mestre

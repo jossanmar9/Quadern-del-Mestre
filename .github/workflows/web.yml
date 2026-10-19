@@ -1,0 +1,41 @@
+# Publica la web de presentació (GitHub Pages) cada vegada que es pugen canvis a main.
+# Cal tindre Settings → Pages → Source en «GitHub Actions».
+name: Web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  construeix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Genera la web
+        run: python3 eines/web.py _site
+      - name: Fa els manuals en PDF
+        run: sh eines/manuals-pdf.sh _site/pdf
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  publica:
+    needs: construeix
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.desplega.outputs.page_url }}
+    steps:
+      - id: desplega
+        uses: actions/deploy-pages@v4
