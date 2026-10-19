@@ -1,0 +1,12 @@
+# Dades de les partides (es creen en engegar el servidor)
+partides/
+quadern.json
+
+# Python
+__pycache__/
+*.pyc
+
+# PyInstaller
+build/
+dist/
+*.spec
