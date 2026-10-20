@@ -18,7 +18,7 @@
 # Commons Reconeixement 4.0 Internacional (https://creativecommons.org/licenses/by/4.0/legalcode).
 # Projecte de fans no oficial, sense relació amb Wizards of the Coast.
 """
-Quadern del Mestre (versió 1.2) — servidor local per a portar partides de rol.
+Quadern del Mestre (versió 1.3) — servidor local per a portar partides de rol.
 
 Tot va en aquest únic fitxer: el servidor, la pàgina web i el compendi SRD 5.2.1.
 Un ordinador l'executa i la resta s'hi connecta des del navegador.
@@ -39,6 +39,7 @@ import argparse
 import base64
 import copy
 import gzip
+import io
 import json
 import os
 import queue
@@ -51,11 +52,12 @@ import threading
 import time
 import unicodedata
 import webbrowser
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.2"
+VERSION = "1.3"
 FROZEN = getattr(sys, "frozen", False)          # executable de Windows fet amb PyInstaller
 DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent
 INSTALLAT = (DIR / "installat").exists()       # el posen l'instal·lador de Windows i el paquet .deb
@@ -80,7 +82,18 @@ def set_data_dir(path):
 
 set_data_dir(user_data_dir() if INSTALLAT else DIR)
 MAX_UPLOAD = 20 * 1024 * 1024
+MAX_AUDIO = 60 * 1024 * 1024
+MAX_IMPORT = 400 * 1024 * 1024
 IMG_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}
+AUDIO_TYPES = {"audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/ogg": "ogg", "audio/wav": "wav", "audio/x-wav": "wav",
+               "audio/wave": "wav", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "m4a", "audio/webm": "webm",
+               "audio/flac": "flac", "audio/x-flac": "flac"}
+FILE_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp", "gif": "image/gif", "mp3": "audio/mpeg",
+              "ogg": "audio/ogg", "wav": "audio/wav", "m4a": "audio/mp4", "webm": "audio/webm", "flac": "audio/flac"}
+FILE_RE = re.compile(r"[a-f0-9]{16,40}\.(jpg|png|webp|gif|mp3|ogg|wav|m4a|webm|flac)")
+BACKUP_KEEP = 15            # còpies que es guarden de cada partida
+BACKUP_EVERY = 30 * 60      # mentre es juga, una còpia cada mitja hora (si hi ha hagut canvis)
+BACKUP_RE = re.compile(r"\d{8}-\d{6}(?:-\d+)?-[a-z]+")
 # Paraules per a la contrasenya del màster (paraula + número, per exemple «drac427»):
 # curtes, sense accents ni apòstrofs, perquè s'escriguen bé des del mòbil.
 WORDS = ("drac", "mag", "elf", "nan", "orc", "runa", "espasa", "torre", "llop", "corb", "foc", "gel",
@@ -96,6 +109,7 @@ state = {
     "active": None,    # id de la partida oberta
     "password": "",    # contrasenya del màster
     "port": 8767,
+    "last_backup": 0,  # quan s'ha fet l'última còpia automàtica de la partida oberta
 }
 clients = []
 dirty = threading.Event()
@@ -179,6 +193,11 @@ def saver():
         dirty.clear()
         try:
             save_now()
+            if time.time() - state["last_backup"] > BACKUP_EVERY:
+                with lock:
+                    cid, docs = state["active"], copy.deepcopy(state["docs"])
+                    state["last_backup"] = time.time()
+                make_backup(cid, docs, "partida")
         except Exception as e:  # noqa: BLE001
             print(f"[!] No s'ha pogut guardar: {e}")
 
@@ -196,11 +215,128 @@ def activate(cid):
         docs = {}
     state["docs"] = docs
     state["active"] = cid
+    state["last_backup"] = time.time()
+    try:
+        make_backup(cid, docs, "obrir")
+    except OSError as e:
+        print(f"[!] No s'ha pogut fer la còpia de seguretat de {cid}: {e}")
 
 
 def new_campaign(name):
     cid = slugify(name)
     write_json(camp_file(cid), {"docs": {"campaign/main": {"name": name}}})
+    return cid
+
+
+# ---------------------------------------------------------------- còpies de seguretat
+def backup_dir(cid):
+    return DATA_DIR / "copies" / cid
+
+
+def make_backup(cid, docs, reason):
+    """Guarda una còpia de la partida a copies/<partida>/ i esborra les més antigues."""
+    if not docs or len(docs) <= 1:     # una partida acabada de crear encara no té res a guardar
+        return None
+    d = backup_dir(cid)
+    d.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    name, n = f"{stamp}-{reason}", 2
+    while (d / f"{name}.json").exists():
+        name, n = f"{stamp}-{n}-{reason}", n + 1
+    write_json(d / f"{name}.json", {"docs": docs})
+    for old in sorted(d.glob("*.json"), key=lambda f: (f.stat().st_mtime_ns, f.name))[:-BACKUP_KEEP]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    return name
+
+
+def list_backups(cid):
+    d = backup_dir(cid)
+    if not d.exists():
+        return []
+    out = []
+    for f in sorted(d.glob("*.json"), key=lambda f: (f.stat().st_mtime_ns, f.name), reverse=True):
+        if not BACKUP_RE.fullmatch(f.stem):
+            continue
+        st_ = f.stat()
+        out.append({"id": f.stem, "ts": int(st_.st_mtime * 1000), "size": st_.st_size, "reason": f.stem.rsplit("-", 1)[1]})
+    return out
+
+
+def campaign_docs(cid):
+    """Els documents d'una partida (la oberta, des de la memòria)."""
+    if cid == state["active"]:
+        return copy.deepcopy(state["docs"])
+    return read_json(camp_file(cid)).get("docs", {})
+
+
+# ---------------------------------------------------------------- exportar i importar
+def export_zip(cid):
+    docs = campaign_docs(cid)
+    name = camp_name(docs, cid)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        info = {"format": "quadern-del-mestre", "versio": 1, "programa": VERSION, "nom": name,
+                "exportada": time.strftime("%Y-%m-%d %H:%M"), "docs": docs}
+        z.writestr("partida.json", json.dumps(info, ensure_ascii=False, indent=1))
+        if files_dir(cid).exists():
+            for f in sorted(files_dir(cid).iterdir()):
+                if f.is_file() and FILE_RE.fullmatch(f.name):
+                    z.write(f, "fitxers/" + f.name, compress_type=zipfile.ZIP_STORED)
+    return name, buf.getvalue()
+
+
+class ImportError_(Exception):
+    pass
+
+
+def check_docs(docs):
+    if not isinstance(docs, dict) or len(docs) > 20000:
+        raise ImportError_("El fitxer no és una partida del Quadern del Mestre.")
+    for k, v in docs.items():
+        if not valid_path(k) or not isinstance(v, dict):
+            raise ImportError_("El fitxer no és una partida del Quadern del Mestre.")
+    return docs
+
+
+def import_campaign(data):
+    """Crea una partida nova a partir d'un .zip exportat (o d'un .json de partides/). Torna l'id."""
+    files = {}
+    if data[:2] == b"PK":
+        try:
+            z = zipfile.ZipFile(io.BytesIO(data))
+            infos = z.infolist()
+            if len(infos) > 5000 or sum(i.file_size for i in infos) > 2 * MAX_IMPORT:
+                raise ImportError_("El fitxer és massa gran.")
+            info = json.loads(z.read("partida.json").decode("utf-8"))
+            for i in infos:
+                if i.filename.startswith("fitxers/") and FILE_RE.fullmatch(i.filename[8:]):
+                    files[i.filename[8:]] = z.read(i)
+        except ImportError_:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise ImportError_("El fitxer no és una partida del Quadern del Mestre.") from e
+    else:
+        try:
+            info = json.loads(data.decode("utf-8"))
+        except Exception as e:  # noqa: BLE001
+            raise ImportError_("El fitxer no és una partida del Quadern del Mestre.") from e
+    if not isinstance(info, dict):
+        raise ImportError_("El fitxer no és una partida del Quadern del Mestre.")
+    docs = check_docs(info.get("docs"))
+    name = camp_name(docs, "") or str(info.get("nom") or "") or "Partida importada"
+    if any(c["name"] == name for c in list_campaigns()):
+        name = f"{name} (importada)"
+    docs["campaign/main"] = {**(docs.get("campaign/main") or {}), "name": name}
+    cid = slugify(name)
+    if files:
+        d = files_dir(cid)
+        d.mkdir(parents=True, exist_ok=True)
+        for fname, blob in files.items():
+            (d / fname).write_bytes(blob)
+    write_json(camp_file(cid), {"docs": docs})
     return cid
 
 
@@ -303,6 +439,104 @@ def hp_word(hp, mx):
         if r <= lim:
             return w
     return "healthy"
+
+
+# ---------------------------------------------------------------- línia de visió
+# Amb la boira automàtica, el servidor revela les caselles que veuen les fitxes dels personatges
+# jugadors: fins a la distància de visió i sense travessar parets, portes tancades, roca ni arbres.
+OPAQUE_WALLS = {"wall", "secret", "door"}
+OPAQUE_TILES = {"rock", "tree"}
+VISION_DEFAULT_M = 18
+VISION_MAX_CELLS = 30
+
+
+def sees(walls, tiles, cols, rows, x0, y0, x1, y1):
+    """Hi ha línia de visió del centre de (x0,y0) al centre de (x1,y1)?"""
+    def edge(ax, ay, bx, by):
+        k = f"{max(ax, bx)},{ay},w" if ay == by else f"{ax},{max(ay, by)},n"
+        return walls.get(k) in OPAQUE_WALLS
+
+    def solid(x, y):
+        return x < 0 or y < 0 or x >= cols or y >= rows or tiles.get(f"{x},{y}") in OPAQUE_TILES
+
+    dx, dy = x1 - x0, y1 - y0
+    sx, sy = (1 if dx > 0 else -1), (1 if dy > 0 else -1)
+    nx, ny = abs(dx), abs(dy)
+    x, y, ix, iy = x0, y0, 0, 0
+    while ix < nx or iy < ny:
+        if nx == 0:
+            step = "y"
+        elif ny == 0:
+            step = "x"
+        else:
+            a, b = (1 + 2 * ix) * ny, (1 + 2 * iy) * nx
+            step = "x" if a < b else "y" if a > b else "d"
+        if step == "d":   # passa just per una cantonada: n'hi ha prou que un dels dos camins estiga lliure
+            via_x = not edge(x, y, x + sx, y) and not solid(x + sx, y) and not edge(x + sx, y, x + sx, y + sy)
+            via_y = not edge(x, y, x, y + sy) and not solid(x, y + sy) and not edge(x, y + sy, x + sx, y + sy)
+            if not (via_x or via_y):
+                return False
+            x, y, ix, iy = x + sx, y + sy, ix + 1, iy + 1
+        elif step == "x":
+            if edge(x, y, x + sx, y):
+                return False
+            x, ix = x + sx, ix + 1
+        else:
+            if edge(x, y, x, y + sy):
+                return False
+            y, iy = y + sy, iy + 1
+        if (x, y) != (x1, y1) and solid(x, y):
+            return False
+    return True
+
+
+def vision_eyes(mid):
+    """Les caselles des d'on miren els personatges jugadors que hi ha al mapa."""
+    docs = state["docs"]
+    out = []
+    for p, tk in docs.items():
+        s = seg(p)
+        if len(s) != 4 or s[0] != "maps" or s[1] != mid or s[2] != "tokens" or tk.get("hidden"):
+            continue
+        ch = docs.get("characters/" + str(tk.get("charId")))
+        if not ch or ch.get("npc") or ch.get("secret"):
+            continue
+        try:
+            x, y, n = int(tk.get("x", 0)), int(tk.get("y", 0)), max(1, min(4, int(tk.get("size", 1))))
+        except (TypeError, ValueError):
+            continue
+        out += [(x + i, y + j) for i in range(n) for j in range(n)]
+    return out
+
+
+def auto_reveal(mid):
+    """Revela el que veuen els personatges. Torna True si s'ha revelat alguna casella nova."""
+    mp_ = state["docs"].get("maps/" + str(mid))
+    fog = (mp_ or {}).get("fog") or {}
+    if not mp_ or not fog.get("on") or not fog.get("auto"):
+        return False
+    try:
+        cols, rows = int(mp_.get("cols", 0)), int(mp_.get("rows", 0))
+        units = float(mp_.get("units") or 1.5)
+        dist = float(fog.get("dist") or VISION_DEFAULT_M)
+    except (TypeError, ValueError):
+        return False
+    r = max(1, min(VISION_MAX_CELLS, int(dist / units + 1e-9)))
+    walls, tiles = mp_.get("walls") or {}, mp_.get("tiles") or {}
+    rev = dict(fog.get("rev") or {})
+    changed = False
+    for ex, ey in vision_eyes(mid):
+        for y in range(max(0, ey - r), min(rows, ey + r + 1)):
+            for x in range(max(0, ex - r), min(cols, ex + r + 1)):
+                k = f"{x},{y}"
+                if rev.get(k):
+                    continue
+                if sees(walls, tiles, cols, rows, ex, ey, x, y):
+                    rev[k] = 1
+                    changed = True
+    if changed:
+        state["docs"]["maps/" + str(mid)] = {**mp_, "fog": {**fog, "rev": rev}}
+    return changed
 
 
 def visible_to(path, doc, sess):
@@ -554,8 +788,10 @@ class Handler(BaseHTTPRequestHandler):
         if route.startswith("/fitxer/"):
             return self._file(route[len("/fitxer/"):])
         sess = self._session()
-        if route in ("/api/campaigns", "/api/snapshot", "/api/events") and not sess:
+        if route in ("/api/campaigns", "/api/snapshot", "/api/events", "/api/export") and not sess:
             return self._json(401, {"error": "Sessió no vàlida. Torna a entrar."})
+        if route == "/api/export":
+            return self._export(sess)
         if route == "/api/campaigns":
             with lock:
                 return self._json(200, {"active": state["active"], "list": list_campaigns(),
@@ -572,14 +808,29 @@ class Handler(BaseHTTPRequestHandler):
         sess = self._session()
         if not sess:
             return self._json(401, {"error": "Sessió no vàlida. Torna a entrar."})
-        if not re.fullmatch(r"[a-f0-9]{16,40}\.(jpg|png|webp|gif)", name):
+        if not FILE_RE.fullmatch(name):
+            return self._json(404, {"error": "No trobat"})
+        ext = name.rsplit(".", 1)[1]
+        if ext in AUDIO_TYPES.values() and not sess["dm"]:    # la música només la sent el màster
             return self._json(404, {"error": "No trobat"})
         f = files_dir(state["active"]) / name
         if not f.exists():
             return self._json(404, {"error": "No trobat"})
-        ext = name.rsplit(".", 1)[1]
-        ctype = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp", "gif": "image/gif"}[ext]
-        return self._send(200, f.read_bytes(), ctype, {"Cache-Control": "private, max-age=31536000, immutable"})
+        return self._send(200, f.read_bytes(), FILE_TYPES[ext], {"Cache-Control": "private, max-age=31536000, immutable"})
+
+    def _export(self, sess):
+        if not sess["dm"]:
+            return self._json(403, {"error": "Només el màster pot gestionar les partides."})
+        cid = (self._query().get("id") or [""])[0]
+        with lock:
+            if not re.fullmatch(r"[a-z0-9-]{1,60}", cid) or not camp_file(cid).exists():
+                return self._json(404, {"error": "Aquesta partida ja no existeix."})
+            if cid == state["active"]:
+                save_now()
+            name, blob = export_zip(cid)
+        fname = (slugify_plain(name) or "partida") + "-" + time.strftime("%Y%m%d") + ".zip"
+        return self._send(200, blob, "application/zip", {"Content-Disposition": f'attachment; filename="{fname}"',
+                                                          "Cache-Control": "no-store"})
 
     def _events(self, sess):
         self.send_response(200)
@@ -623,6 +874,8 @@ class Handler(BaseHTTPRequestHandler):
         route = self.path.split("?")[0]
         if route == "/api/upload":
             return self._upload()
+        if route == "/api/import":
+            return self._import()
         try:
             body = self._body()
         except Exception:  # noqa: BLE001
@@ -637,6 +890,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._roll(body)
         if route == "/api/ping":
             return self._ping(body)
+        if route == "/api/draw":
+            return self._draw(body)
         self._json(404, {"error": "No trobat"})
 
     def _join(self, body):
@@ -692,8 +947,14 @@ class Handler(BaseHTTPRequestHandler):
                     docs[path] = data
                 else:
                     docs[path] = deep_merge(docs.get(path) or {}, data)
+            changed = [path]
+            s = seg(path)
+            if s[0] == "maps" or s[0] == "characters":   # boira automàtica: el que veuen ara els personatges
+                for mid in ([s[1]] if s[0] == "maps" else [m[5:] for m in list(docs) if m.count("/") == 1 and m.startswith("maps/")]):
+                    if auto_reveal(mid):
+                        changed.append("maps/" + mid)
             dirty.set()
-        broadcast([path])
+        broadcast(list(dict.fromkeys(changed)))
         return self._json(200, {"ok": True})
 
     def _roll(self, body):
@@ -726,23 +987,64 @@ class Handler(BaseHTTPRequestHandler):
         broadcast_event("ping", p)
         return self._json(200, {"ok": True})
 
+    def _draw(self, body):
+        """Un traç del llapis: no es guarda, s'envia a tothom i s'esvaeix sol."""
+        sess = self._session()
+        if not sess:
+            return self._json(401, {"error": "Sessió no vàlida. Torna a entrar."})
+        try:
+            pts = [[round(float(p[0]), 2), round(float(p[1]), 2)] for p in body.get("pts") or []][:600]
+            col = str(body.get("col") or "")
+            if not re.fullmatch(r"#[0-9A-Fa-f]{6}", col):
+                col = ""
+            d = {"map": str(body.get("map") or "")[:40], "pts": pts, "col": col, "uid": sess["uid"], "dm": sess["dm"]}
+        except (TypeError, ValueError, IndexError):
+            return self._json(400, {"error": "Petició mal formada"})
+        if len(pts) < 2:
+            return self._json(400, {"error": "Petició mal formada"})
+        broadcast_event("draw", d)
+        return self._json(200, {"ok": True})
+
+    def _import(self):
+        sess = self._session()
+        if not sess:
+            return self._json(401, {"error": "Sessió no vàlida. Torna a entrar."})
+        if not sess["dm"]:
+            return self._json(403, {"error": "Només el màster pot gestionar les partides."})
+        try:
+            data = self._raw(MAX_IMPORT)
+        except ValueError:
+            return self._json(413, {"error": "El fitxer és massa gran."})
+        with lock:
+            try:
+                cid = import_campaign(data)
+            except ImportError_ as e:
+                return self._json(400, {"error": str(e)})
+            result = {"active": state["active"], "list": list_campaigns(), "password": state["password"], "imported": cid}
+        return self._json(200, result)
+
     def _upload(self):
         sess = self._session()
         if not sess:
             return self._json(401, {"error": "Sessió no vàlida. Torna a entrar."})
         kind = (self._query().get("kind") or [""])[0]
-        if kind not in ("map", "handout", "portrait"):
+        if kind not in ("map", "handout", "portrait", "audio"):
             return self._json(400, {"error": "Petició mal formada"})
         if kind != "portrait" and not sess["dm"]:
             return self._json(403, {"error": "No tens permís per a canviar això."})
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-        ext = IMG_TYPES.get(ctype)
-        if not ext:
-            return self._json(415, {"error": "Només es poden pujar imatges JPG, PNG, WebP o GIF."})
+        if kind == "audio":
+            ext = AUDIO_TYPES.get(ctype)
+            if not ext:
+                return self._json(415, {"error": "Només es poden pujar sons MP3, OGG, WAV, M4A, WebM o FLAC."})
+        else:
+            ext = IMG_TYPES.get(ctype)
+            if not ext:
+                return self._json(415, {"error": "Només es poden pujar imatges JPG, PNG, WebP o GIF."})
         try:
-            data = self._raw(MAX_UPLOAD)
+            data = self._raw(MAX_AUDIO if kind == "audio" else MAX_UPLOAD)
         except ValueError:
-            return self._json(413, {"error": "La imatge és massa gran (màxim 20 MB)."})
+            return self._json(413, {"error": "El so és massa gran (màxim 60 MB)." if kind == "audio" else "La imatge és massa gran (màxim 20 MB)."})
         if not data:
             return self._json(400, {"error": "Petició mal formada"})
         with lock:
@@ -800,6 +1102,33 @@ class Handler(BaseHTTPRequestHandler):
                 camp_file(cid).replace(TRASH_DIR / f"{cid}-{stamp}.json")
                 if files_dir(cid).exists():
                     files_dir(cid).replace(TRASH_DIR / f"{cid}-{stamp}-fitxers")
+            elif action == "backups":
+                if not camp_file(cid).exists():
+                    return self._json(404, {"error": "Aquesta partida ja no existeix."})
+                return self._json(200, {"id": cid, "list": list_backups(cid)})
+            elif action == "backup":
+                if not camp_file(cid).exists():
+                    return self._json(404, {"error": "Aquesta partida ja no existeix."})
+                if cid == state["active"]:
+                    save_now()
+                make_backup(cid, campaign_docs(cid), "ma")
+                return self._json(200, {"id": cid, "list": list_backups(cid)})
+            elif action == "restore":
+                bid = str(body.get("backup") or "")
+                bf = backup_dir(cid) / f"{bid}.json"
+                if not camp_file(cid).exists() or not BACKUP_RE.fullmatch(bid) or not bf.exists():
+                    return self._json(404, {"error": "Aquesta còpia ja no existeix."})
+                try:
+                    docs = check_docs(read_json(bf).get("docs"))
+                except Exception:  # noqa: BLE001
+                    return self._json(400, {"error": "La còpia està danyada."})
+                make_backup(cid, campaign_docs(cid), "abans")     # per si de cas, una còpia del que hi havia
+                if cid == state["active"]:
+                    state["docs"] = docs
+                    save_now()
+                    switched = True
+                else:
+                    write_json(camp_file(cid), {"docs": docs})
             elif action == "password":
                 pw = str(body.get("password") or "").strip()
                 if len(pw) < 3:

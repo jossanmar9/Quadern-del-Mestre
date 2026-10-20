@@ -316,3 +316,6 @@ h3.cc-name::after{display:none}
   .sheet,.note-ed{padding:16px}
   #c-name{font-size:30px}
 }
+.banner.off{background:var(--blood);color:var(--accent-ink);font-weight:600;display:flex;align-items:center;gap:10px}
+.banner.off::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;flex:none;animation:qm-blink 1.2s ease-in-out infinite}
+@keyframes qm-blink{50%{opacity:.25}}

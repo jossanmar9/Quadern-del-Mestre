@@ -1,5 +1,6 @@
 /*
- * Quadern del Mestre — combat: iniciativa, torns, punts de golpe, estats i dificultat de l'encontre.
+ * Quadern del Mestre — combat: iniciativa, torns, punts de golpe, estats amb durada, concentració
+ * i dificultat de l'encontre.
  * Llicència GPL-3.0 o posterior.
  */
 const cmbDoc = () => getDoc('combat/main') || {active: false, round: 1, turn: 0, list: []};
@@ -44,7 +45,11 @@ function cmbRow(r, i, c, isDm) {
   const cur = c.active && i === (c.turn || 0), hp = r.maxHp != null ? hpPct(r.hp, r.maxHp) : null, down = r.maxHp != null ? (r.hp || 0) <= 0 : r.state === 'down';
   const hpCell = r.maxHp != null ? `<div class="hpc"><span class="mono">${r.hp ?? 0}/${r.maxHp}${r.tmp ? ` (+${r.tmp})` : ''}</span><div class="hpbar"><i class="${hpCls(hp)}" style="width:${hp * 100}%"></i></div></div>`
     : `<span class="state-word">${esc(t(HP_STATE[r.state] || ''))}</span>`;
-  const conds = (r.conds || []).map(k => `<button class="cond" data-cond-x="${k}" ${isDm || (r.ch && r.ch.ownerId === S.uid) ? '' : 'disabled'} title="${esc(t('Llevar'))}">${esc(condName(k))}</button>`).join('');
+  const durs = r.durs || {};
+  const condTxt = k => esc(condName(k)) + (durs[k] ? ` <b class="dur" title="${esc(t('Rondes que queden'))}">${durs[k]}</b>` : '');
+  const conds = (r.conds || []).map(k => isDm
+    ? `<span class="cond chip2"><button class="cond-n" data-cond-dur="${k}" title="${esc(t('Durada en rondes'))}">${condTxt(k)}</button><button class="cond-x" data-cond-x="${k}" aria-label="${esc(t('Llevar'))}">×</button></span>`
+    : `<button class="cond" data-cond-x="${k}" ${r.ch && r.ch.ownerId === S.uid ? '' : 'disabled'} title="${esc(t('Llevar'))}">${condTxt(k)}</button>`).join('');
   return `<tr class="${cur ? 'cur' : ''} ${down ? 'down' : ''} ${r.hidden ? 'hid' : ''}" data-row="${r.id}">
     <td>${isDm ? `<input class="init" type="number" value="${r.init ?? ''}" data-init aria-label="${esc(t('Iniciativa'))}">` : `<b class="mono">${r.init ?? '—'}</b>`}</td>
     <td><span class="who">${r.ch ? avatar(r.ch, 26) : `<span class="dot" style="background:${esc(r.color || (r.kind === 'pc' ? '#2B4A6B' : '#8C2A1C'))}"></span>`}${r.monster && isDm ? `<button class="link" data-stats="${esc(r.monster)}">${esc(r.name)}</button>` : esc(r.name)}${r.hidden ? ` <span class="sec-tag">${esc(t('amagat'))}</span>` : ''}</span></td>
@@ -65,7 +70,8 @@ document.addEventListener('click', e => {
   }
   const x = e.target, row = x.closest('[data-row]'), rid = row?.dataset.row;
   if (x.id === 'cmb-start') {const c = clone(cmbDoc()); for (const r of c.list) if (r.init == null && r.kind !== 'pc') r.init = rollInit(r, true); sortCmb(c); c.active = true; c.round = 1; c.turn = 0; saveCmb(c); return}
-  if (x.id === 'cmb-next' || x.id === 'cmb-prev') {const c = clone(cmbDoc()), n = c.list.length; if (!n) return; let tt = (c.turn || 0) + (x.id === 'cmb-next' ? 1 : -1); if (tt >= n) {tt = 0; c.round = (c.round || 1) + 1} if (tt < 0) {tt = n - 1; c.round = Math.max(1, (c.round || 1) - 1)} c.turn = tt; saveCmb(c); return}
+  if (x.id === 'cmb-next' || x.id === 'cmb-prev') {const c = clone(cmbDoc()), n = c.list.length; if (!n) return; let tt = (c.turn || 0) + (x.id === 'cmb-next' ? 1 : -1); if (tt >= n) {tt = 0; c.round = (c.round || 1) + 1} if (tt < 0) {tt = n - 1; c.round = Math.max(1, (c.round || 1) - 1)} c.turn = tt;
+    const ended = x.id === 'cmb-next' ? tickDurations(c, tt) : []; saveCmb(c); for (const f of ended) f(); return}
   if (x.id === 'cmb-end') {armed(x, () => {const c = clone(cmbDoc()); c.active = false; c.turn = 0; c.round = 1; c.list = c.list.filter(r => r.kind === 'pc'); for (const r of c.list) r.init = null; saveCmb(c); toast(t('Combat acabat. He tret els monstres de la llista.'))}, t('Segur? Prem de nou')); return}
   if (x.id === 'cmb-rollnpc') {const c = clone(cmbDoc()); for (const r of c.list) if (r.kind !== 'pc') r.init = rollInit(r, true); sortCmb(c); saveCmb(c); return}
   if (x.id === 'cmb-sort') {const c = clone(cmbDoc()); sortCmb(c); saveCmb(c); return}
@@ -81,6 +87,7 @@ document.addEventListener('click', e => {
   if (x.closest('[data-hide]')) {cmbUpdateRow(rid, r => {r.hidden = !r.hidden; const tk = allTokens().find(q => q.tok.cmbId === rid); if (tk) write(`maps/${tk.map}/tokens/${tk.tok.id}`, {hidden: r.hidden}, 'update')}); return}
   if (x.closest('[data-rm]')) {const c = clone(cmbDoc()); const i = c.list.findIndex(r => r.id === rid); if (i < 0) return; c.list.splice(i, 1); if (c.turn >= c.list.length) c.turn = 0; else if (i < c.turn) c.turn--; saveCmb(c); return}
   const cx = x.closest('[data-cond-x]'); if (cx) {setCond(rid, cx.dataset.condX, false); return}
+  const cd = x.closest('[data-cond-dur]'); if (cd) {durModal(rid, cd.dataset.condDur); return}
 });
 document.addEventListener('change', e => {
   if (st.tab !== 'combat') return; const x = e.target, row = x.closest('[data-row]'); if (!row) return; const rid = row.dataset.row;
@@ -88,15 +95,51 @@ document.addEventListener('change', e => {
   if (x.dataset.init !== undefined && dm()) cmbUpdateRow(rid, r => {r.init = x.value === '' ? null : +x.value});
 });
 document.addEventListener('keydown', e => {if (st.tab === 'combat' && e.key === 'Enter' && e.target.dataset?.amt !== undefined) {e.preventDefault(); const row = e.target.closest('[data-row]'); const n = Math.abs(+e.target.value || 0); if (n) {applyHpRow(row.dataset.row, -n); e.target.value = ''}}});
+/** Al començament del torn d'una criatura es descompten les rondes dels seus estats. Torna què cal fer després de guardar. */
+function tickDurations(c, i) {
+  const r = c.list[i], after = []; if (!r || !r.durs) return after;
+  const v = rowView(r), gone = [];
+  for (const k in r.durs) {r.durs[k] = (+r.durs[k] || 0) - 1; if (r.durs[k] <= 0) {delete r.durs[k]; gone.push(k)}}
+  if (!gone.length) return after;
+  if (r.kind === 'pc' && r.charId) after.push(() => {const ch = getDoc('characters/' + r.charId); if (ch) write('characters/' + r.charId, {conds: (ch.conds || []).filter(k => !gone.includes(k))}, 'update')});
+  else r.conds = (r.conds || []).filter(k => !gone.includes(k));
+  after.push(() => toast(t('S\'ha acabat: {x} ({n}).', {x: gone.map(condName).join(', '), n: v.name}), 5000));
+  return after;
+}
+function durModal(rid, k) {
+  const r = (cmbDoc().list || []).find(x => x.id === rid); if (!r) return; const v = rowView(r);
+  openModal(`<h2>${esc(t('{x}: durada', {x: condName(k)}))}</h2><p class="muted" style="margin:0">${esc(t('{n}. Les rondes es descompten al començament de cada torn seu; quan arriben a zero, l\'estat es lleva sol.', {n: v.name}))}</p>
+    <label class="field"><span>${esc(t('Rondes (buit: sense límit)'))}</span><input class="in" type="number" min="1" max="999" id="du-n" value="${esc(r.durs?.[k] || '')}" autofocus></label>
+    <div class="row">${[1, 2, 3, 10, 100].map(n => `<button class="btn sm" data-du="${n}">${n === 10 ? esc(t('1 minut')) : n === 100 ? esc(t('10 minuts')) : n}</button>`).join('')}</div>
+    <div class="foot"><button class="btn" id="du-x">${esc(t('Cancel·lar'))}</button><button class="btn pri" id="du-ok">${esc(t('Guardar'))}</button></div>`, (m, close) => {
+    const save = () => {const n = Math.round(+$('#du-n', m).value || 0); cmbUpdateRow(rid, rr => {rr.durs = {...(rr.durs || {})}; if (n > 0) rr.durs[k] = n; else delete rr.durs[k]}); close()};
+    $('#du-x', m).onclick = close; $('#du-ok', m).onclick = save; $('#du-n', m).onkeydown = e => {if (e.key === 'Enter') save()};
+    m.addEventListener('click', e => {const b = e.target.closest('[data-du]'); if (b) {$('#du-n', m).value = b.dataset.du; save()}});
+  });
+}
+/** Salvació de Constitució per a mantindre la concentració després de rebre dany (CD 10 o la meitat del dany, fins a 30). */
+function concCheck({name, mod, dmg, down, priv, drop}) {
+  if (down) {drop(); toast(t('{n} cau i perd la concentració.', {n: name}), 5000); return}
+  const dc = clamp(Math.floor(dmg / 2), 10, 30);
+  const r = doRoll(M('{n}: salvació de concentració (CD {d})', {n: name, d: dc}), '1d20' + sgn(mod || 0).replace('−', '-'), {adv: '', quiet: true, priv});
+  if (!r) return;
+  if (r.total >= dc) toast(t('{n} manté la concentració ({x} contra CD {d}).', {n: name, x: r.total, d: dc}), 5000);
+  else {drop(); toast(t('{n} perd la concentració ({x} contra CD {d}).', {n: name, x: r.total, d: dc}), 5000)}
+}
 function setCond(rid, k, on) {
   const r = (cmbDoc().list || []).find(x => x.id === rid); if (!r) return;
+  if (!on && r.durs?.[k] && dm()) cmbUpdateRow(rid, rr => {rr.durs = {...(rr.durs || {})}; delete rr.durs[k]});
   if (r.kind === 'pc' && r.charId) {const ch = getDoc('characters/' + r.charId); if (!ch) return; const s = new Set(ch.conds || []); on ? s.add(k) : s.delete(k); write('characters/' + r.charId, {conds: [...s]}, 'update'); return}
   if (!dm()) return; cmbUpdateRow(rid, rr => {const s = new Set(rr.conds || []); on ? s.add(k) : s.delete(k); rr.conds = [...s]});
 }
 function applyHpRow(rid, delta) {
   const r = (cmbDoc().list || []).find(x => x.id === rid); if (!r) return;
   if (r.kind === 'pc' && r.charId) {const ch = getDoc('characters/' + r.charId); if (ch) applyHpChar({...ch, id: r.charId}, delta < 0 ? '-1' : '1', Math.abs(delta)); return}
-  cmbUpdateRow(rid, rr => {if (delta < 0) {let left = -delta; if (rr.tmp) {const u = Math.min(rr.tmp, left); rr.tmp -= u; left -= u} rr.hp = Math.max(0, (rr.hp || 0) - left)} else rr.hp = Math.min(rr.maxHp || 0, (rr.hp || 0) + delta)});
+  let conc = null;
+  cmbUpdateRow(rid, rr => {if (delta < 0) {let left = -delta; if (rr.tmp) {const u = Math.min(rr.tmp, left); rr.tmp -= u; left -= u} rr.hp = Math.max(0, (rr.hp || 0) - left);
+    if ((rr.conds || []).includes('conc')) conc = {down: rr.hp <= 0}} else rr.hp = Math.min(rr.maxHp || 0, (rr.hp || 0) + delta)});
+  if (conc) {const mon = r.monster && !String(r.monster).startsWith('own:') ? srdGet('criatura', r.monster) : null;
+    concCheck({name: r.name, mod: mon?.c?.salv?.[2] ?? (+r.conMod || 0), dmg: -delta, down: conc.down, priv: true, drop: () => setCond(rid, 'conc', false)})}
 }
 function allTokens() {const out = []; for (const m of col('maps')) for (const tk of col('maps/' + m.id + '/tokens')) out.push({map: m.id, tok: tk}); return out}
 function otherModal() {

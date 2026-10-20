@@ -1,0 +1,68 @@
+name: "Errada / Error"
+description: "Alguna cosa no funciona com hauria. / Algo no funciona como debería."
+title: "[Errada] "
+labels: ["errada"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gràcies per avisar! Com més detalls, més fàcil serà arreglar-ho. Pots escriure en valencià o en castellà.
+        ¡Gracias por avisar! Cuantos más detalles, más fácil será arreglarlo. Puedes escribir en valenciano o en castellano.
+  - type: textarea
+    id: que
+    attributes:
+      label: "Què ha passat? / ¿Qué ha pasado?"
+      description: "Què esperaves que passara i què ha passat en realitat. / Qué esperabas que pasara y qué ha pasado en realidad."
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: "Com es pot repetir? / ¿Cómo se puede repetir?"
+      description: "Els passos, un per línia. / Los pasos, uno por línea."
+      placeholder: |
+        1. Vaig a la pestanya Mapa com a màster
+        2. Active la boira automàtica
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: qui
+    attributes:
+      label: "Qui ho veu? / ¿Quién lo ve?"
+      options:
+        - "El màster / El máster"
+        - "Un jugador / Un jugador"
+        - "Tothom / Todos"
+    validations:
+      required: true
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: "Com arranques el Quadern? / ¿Cómo arrancas el Quadern?"
+      options:
+        - "Windows, amb l'instal·lador / con el instalador"
+        - "Windows portable"
+        - "Linux, amb el .deb / con el .deb"
+        - "Linux, amb el .tar.gz / con el .tar.gz"
+        - "python3 quadern.py"
+    validations:
+      required: true
+  - type: input
+    id: versio
+    attributes:
+      label: "Versió / Versión"
+      description: "Ix a la finestra del Quadern («En marxa · versió…»). / Sale en la ventana del Quadern."
+      placeholder: "1.3"
+    validations:
+      required: true
+  - type: input
+    id: aparell
+    attributes:
+      label: "Aparell i navegador / Dispositivo y navegador"
+      placeholder: "Mòbil Android amb Chrome, portàtil amb Firefox…"
+  - type: textarea
+    id: captures
+    attributes:
+      label: "Captures / Capturas"
+      description: "Si pots, arrossega ací una captura de pantalla. / Si puedes, arrastra aquí una captura de pantalla."

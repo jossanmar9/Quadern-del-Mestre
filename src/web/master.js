@@ -6,7 +6,7 @@ const ms = {note: null, results: [], genSp: 'human', encDiff: 1, encType: '', lo
 const dmNotes = () => col('dmnotes').sort((a, b) => (b.updated || 0) - (a.updated || 0));
 const dmTables = () => col('dmtables').sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-TABS.master = {label: L('Màster'), dmOnly: true, watch: ['dmnotes/', 'dmtables/'], render: renderMaster};
+TABS.master = {label: L('Màster'), dmOnly: true, watch: ['dmnotes/', 'dmtables/', 'dmaudio/'], render: renderMaster};
 function renderMaster() {
   const notes = dmNotes(); if (!ms.note || !notes.some(n => n.id === ms.note)) ms.note = notes[0]?.id || null;
   const n = notes.find(x => x.id === ms.note);
@@ -22,6 +22,7 @@ function renderMaster() {
     <section class="panel ms-tables"><h2>${esc(t('Taules pròpies'))}</h2><p class="small muted">${esc(t('Rumors, esdeveniments, botí… Una opció per línia. Tira-les quan vulgues.'))}</p>
       <ul class="tbl-list">${dmTables().map(tb => `<li><button class="link" data-tedit="${tb.id}">${esc(tb.name || t('Sense nom'))}</button><span class="muted small">${(tb.lines || []).length}</span><button class="btn sm pri" data-troll="${tb.id}">${esc(t('Tirar'))}</button></li>`).join('') || `<li class="muted small">${esc(t('Encara no tens cap taula.'))}</li>`}</ul>
       <button class="btn sm" id="t-new">+ ${esc(t('Taula nova'))}</button></section>
+    ${audioPanel()}
     <section class="panel ms-notes"><h2>${esc(t('Notes secretes'))}</h2><p class="small muted">${esc(t('Només les veus tu: trames, secrets, preparació de la sessió.'))}</p>
       <div class="ms-notes-grid"><div class="notes-list"><button class="btn sm" id="n-new">+ ${esc(t('Nota nova'))}</button>${notes.map(x => `<button class="note-item" data-note="${x.id}" aria-current="${x.id === ms.note}"><span class="t">${esc(x.title || t('Sense títol'))}</span><span class="small muted">${esc(ago(x.updated || 0))}</span></button>`).join('')}</div>
       <div class="note-ed">${n ? `<input class="in" id="note-title" data-nf="title" value="${esc(n.title || '')}" placeholder="${esc(t('Títol'))}"><textarea class="in" id="note-body" data-nf="body">${esc(n.body || '')}</textarea><div class="row" style="justify-content:flex-end"><button class="btn sm danger" id="n-del">${esc(t('Esborrar'))}</button></div>` : `<div class="empty"><b>${esc(t('Sense notes'))}</b>${esc(t('Crea una nota amb el botó de l\'esquerra.'))}</div>`}</div></div></section>

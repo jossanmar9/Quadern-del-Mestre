@@ -44,6 +44,9 @@ jobs:
           python build.py
           python eines/comprova-traduccions.py
 
+      - name: Proves del servidor
+        run: python tests/prova_servidor.py
+
       - name: Prova que arranca
         run: |
           python quadern.py --sense-finestra --sense-navegador --sense-qr --dades "$RUNNER_TEMP/dades" --port 8799 & PID=$!

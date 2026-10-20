@@ -57,11 +57,18 @@ Si arriba algú amb la partida començada, el botó del QR de dalt a la dreta mo
 
 ![Convidar amb el QR.](imatges/ca/02-qr.jpg)
 
-## Partides i partida d'exemple
+## Partides i partides d'exemple
 
 A la pestanya **Partides** el màster crea, obri, duplica i esborra partides. Quan n'obri una, tots els connectats hi passen sols. Les esborrades van a `partides/esborrades/`.
 
-**Crear la partida d'exemple** prepara «La cripta del rei oblidat»: un mapa amb boira, tres personatges, monstres, una sessió al diari, un document i notes del màster. És la manera més ràpida de provar-ho tot.
+Hi ha dues **partides d'exemple**, la manera més ràpida de provar-ho tot. Cadascuna té un mapa, tres personatges, monstres, una sessió al diari, un document i notes del màster:
+
+- **La cripta del rei oblidat**: una cripta amb esquelets i una porta secreta. La boira es revela a mà.
+- **L'emboscada del gual**: un camí de bosc, un riu i un campament de goblins, amb boira automàtica.
+
+**Exportar** baixa una partida sencera (amb les imatges i la música) en un fitxer `.zip`, per a passar-la a un altre ordinador, compartir una aventura o guardar-la a part. **Importar una partida** l'obri en un altre Quadern: es crea com a partida nova i no en substitueix cap.
+
+**Còpies** mostra les còpies de seguretat de la partida, i des d'ací es pot **Restaurar** qualsevol. Vegeu [les còpies de seguretat](#les-dades-i-les-còpies-de-seguretat).
 
 ![La pestanya Partides.](imatges/ca/03-partides.jpg)
 
@@ -76,6 +83,7 @@ El màster tria quin mapa edita i prem **Ensenyar als jugadors** per a decidir q
 | **Moure** | Arrossega fitxes (els jugadors, només les seues) i desplaça el mapa. Roda o pessic per a fer zoom. |
 | **Regle** | Mesura en metres i caselles. Cada casella són 1,5 m, també en diagonal. |
 | **Àrea** | Esfera, con, línia o cub. Ressalta les caselles afectades i la veu tothom. |
+| **Llapis** | Dibuixa damunt del mapa per a assenyalar un camí o explicar un pla. Tothom ho veu, i s'esborra sol al cap d'uns segons. |
 | **Avisar** | Fa uns cercles en un punt perquè tothom hi mire. També amb doble clic. |
 
 ## Què veuen els jugadors
@@ -96,6 +104,8 @@ Al costat de cada fitxa es veu un anell amb la vida: verd, groc o roig.
 - **Parets i portes.** Fes clic a la vora entre dues caselles, o arrossega al llarg de les vores. Hi ha paret, porta, porta oberta, porta secreta i finestra. **Parets automàtiques** en posa al voltant de tot el terreny pintat.
 - **Etiquetes.** Números de sala (com als mòduls d'aventura) o textos.
 - **Boira.** Activa-la i arrossega rectangles per a revelar o amagar zones a mesura que el grup explora.
+
+**Boira automàtica.** Amb **Revelar el que veuen els personatges**, no cal revelar res a mà: cada vegada que un personatge jugador es mou, el Quadern revela el que veu des de la seua fitxa, fins a la **distància de visió** (18 m de manera predeterminada). Les parets, les portes tancades, la roca i els arbres tapen la vista; les portes obertes i les finestres, no. El que ja s'ha vist queda revelat. Les fitxes dels PNJ i les amagades no revelen res. També pots revelar o amagar zones a mà igual que abans.
 
 **Desfer** (o `Ctrl+Z`) torna enrere els canvis del mapa.
 
@@ -130,6 +140,7 @@ Cada jugador crea i edita les seues fitxes. El màster les pot editar totes, can
 - El bonificador de competència, les salvacions, les habilitats i la iniciativa es calculen sols. Un clic al cercle d'una habilitat la fa competent (●) o experta (◆).
 - **Dany**, **Curació** i **Temporals** apliquen els PG bé (primer gasten els temporals). **Descans curt** tira un dau de colp; **descans llarg** ho restableix tot.
 - Prem el retrat per a pujar una imatge del teu personatge.
+- **Pujar de nivell** guia el canvi de nivell: tria si sumes els PG fixos o tires el dau de golpe, i mostra com canvien els PG, els daus de golpe, el bonificador de competència i els espais de conjur. També ensenya els trets de classe del nivell nou (del compendi). Quan el personatge té prou PX, el botó es destaca.
 
 ## Atacs, conjurs i inventari
 
@@ -151,6 +162,10 @@ Cada jugador crea i edita les seues fitxes. El màster les pot editar totes, can
 2. Escriu la iniciativa dels jugadors i prem **Començar el combat**: tira la dels monstres i ordena.
 3. **Torn següent** avança. Al jugador a qui li toca li apareix un avís, i al mapa la seua fitxa porta un anell daurat.
 4. Escriu el dany i prem **−** (o Intro). Els estats s'afigen amb el desplegable.
+
+**Durada dels estats.** Fes clic al nom d'un estat per a posar-li una durada en rondes (per exemple, 10 per a un conjur d'un minut). El número es veu al costat de l'estat i es descompta al començament de cada torn d'eixa criatura; quan arriba a zero, l'estat es lleva sol i ix un avís.
+
+**Concentració.** Si una criatura amb l'estat **Concentració** rep dany, el Quadern tira sol la salvació de Constitució (CD 10, o la meitat del dany si és més) i diu si la manté o la perd. Si la perd, o si cau a 0 PG, lleva l'estat. Funciona igual si el dany s'aplica des de la fitxa del personatge.
 
 La dificultat de l'encontre (baixa, moderada, alta) es calcula amb els PX dels monstres i el nivell del grup.
 
@@ -186,6 +201,11 @@ Els jugadors veuen el compendi sense el bestiari.
 - **Taules pròpies:** rumors, esdeveniments… Una opció per línia, i **Tirar**.
 - **Notes secretes:** només les veu el màster. Els resultats dels generadors s'hi poden enviar amb un clic.
 
+**Música i ambient.** Sona a l'aparell del màster (connecta'l a uns altaveus); els jugadors no ho senten als mòbils.
+
+- **Ambients:** pluja, tempesta, vent, foguera, cova i nit al bosc. Es generen al moment, sense fitxers, i es poden barrejar amb un volum per a cadascun.
+- **Les teues pistes:** puja música o efectes (MP3, OGG, WAV, M4A, WebM o FLAC, fins a 60 MB). Es guarden amb la partida i es poden repetir en bucle.
+
 ## Daus, mòbil, idioma i tema
 
 **Daus.** El panell de daus és a la dreta (al mòbil, al botó **Daus**). Hi ha avantatge i desavantatge, expressions com `2d6+3` o `4d6kh3`, i el màster pot fer tirades secretes. Totes les tirades queden a «Tirades de la taula».
@@ -200,9 +220,13 @@ Els jugadors veuen el compendi sense el bestiari.
 
 ## Les dades i les còpies de seguretat
 
-Cada partida es guarda a `partides/<nom>.json`, i les seues imatges a `partides/<nom>-fitxers/`. Els jugadors, les sessions i la contrasenya del màster es guarden a `quadern.json`.
+Cada partida es guarda a `partides/<nom>.json`, i les seues imatges i sons a `partides/<nom>-fitxers/`. Els jugadors, les sessions i la contrasenya del màster es guarden a `quadern.json`.
 
-El botó **Carpeta de partides** de la finestra obri la carpeta on està tot. Per a fer una còpia de seguretat, copia la carpeta sencera (la que conté `partides` i `quadern.json`) en un llapis USB o en el núvol. Per a recuperar-la, torna-la al seu lloc amb el Quadern tancat.
+**Còpies automàtiques.** El Quadern fa una còpia de la partida cada vegada que s'obri i cada mitja hora mentre es juga, i en guarda les 15 últimes a la carpeta `copies/`. Des de **Partides → Còpies** es pot fer una còpia a mà o **Restaurar** qualsevol. Abans de restaurar, també es guarda el que hi havia, per si de cas.
+
+**Si es perd la connexió**, ix una banda roja a dalt. Els canvis que facen el màster i els jugadors mentrestant no es perden: es guarden sols quan torna la connexió.
+
+El botó **Carpeta de partides** de la finestra obri la carpeta on està tot. Per a tindre una còpia fora de l'ordinador, **exporta** les partides o copia la carpeta sencera (la que conté `partides`, `copies` i `quadern.json`) en un llapis USB o en el núvol.
 
 On es guarda depén de com l'has instal·lat; ho tens a la [guia d'instal·lació](guia-installacio.md#on-es-guarden-les-partides).
 
@@ -213,7 +237,9 @@ On es guarda depén de com l'has instal·lat; ho tens a la [guia d'instal·laci�
 | Els altres no hi poden entrar | Han d'estar a la mateixa wifi. A Windows, permet el programa a «Xarxes privades» i comprova que la wifi és privada. A Linux, si tens tallafoc, obri el port: `sudo ufw allow 8767/tcp`. Algunes xarxes de convidats no deixen que els aparells es vegen. |
 | He oblidat la contrasenya del màster | Està a la finestra del Quadern. També pots arrancar amb `--contrasenya` per a posar-ne una de nova. |
 | «El port ja està en ús» | Ja hi ha un altre Quadern obert. Tanca'l o arranca amb `--port 9002`. |
-| Apareix «S'ha perdut la connexió» | El Quadern s'ha aturat o l'ordinador s'ha adormit. Quan torne, la pàgina es reconnecta sola. |
+| Apareix una banda roja «Sense connexió» | El Quadern s'ha aturat, l'ordinador s'ha adormit o el mòbil ha eixit de la wifi. Quan torne, la pàgina es reconnecta sola i guarda els canvis pendents. |
+| He esborrat alguna cosa sense voler | **Partides → Còpies** i restaura una còpia d'abans. |
+| La boira automàtica no revela res | Comprova que la boira està activada, que la fitxa del mapa està lligada a un personatge jugador (no a un PNJ) i que no està amagada. |
 | Un jugador no pot moure la seua fitxa | La fitxa del mapa ha d'estar lligada al seu personatge, i el personatge ha de ser seu (el màster ho canvia a baix de la fitxa). |
 
 ## Llicències

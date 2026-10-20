@@ -38,15 +38,15 @@ Funciona en **Windows y Linux**. Se instala como cualquier otro programa y las p
 | Sección | Qué hace |
 |---|---|
 | **Mapa** | Imagen de fondo (Dungeondraft, Inkarnate, un escaneo…) con la cuadrícula ajustable, o dibujado a mano: terreno, paredes, puertas, puertas secretas, ventanas, salas y etiquetas. Fichas con la vida en el anillo; cada jugador mueve las suyas. **Regla** en metros y **áreas de efecto** (esfera, cono, línea y cubo). |
-| **Niebla de guerra** | El máster revela zonas y los jugadores no reciben nada de lo que hay debajo, ni las fichas ocultas. |
-| **Personajes** | Fichas completas con las reglas de 2024: características, habilidades, salvaciones, PG, ataques, conjuros con espacios, inventario, monedas, estados, descansos y retrato. Todas las tiradas se hacen desde la ficha. |
-| **Combate** | Iniciativa, turnos y rondas, daño y curación, estados y monstruos ocultos. Calcula la dificultad del encuentro. Los jugadores ven «Herido» o «Malherido» en lugar de los PG de los monstruos. |
+| **Niebla de guerra** | El máster revela zonas a mano, o deja que se revelen solas con lo que ven los personajes (las paredes, las puertas cerradas, la roca y los árboles tapan la vista). Los jugadores no reciben nada de lo que hay debajo, ni las fichas ocultas. |
+| **Personajes** | Fichas completas con las reglas de 2024: características, habilidades, salvaciones, PG, ataques, conjuros con espacios, inventario, monedas, estados, descansos y retrato. Todas las tiradas se hacen desde la ficha. **Subir de nivel** guiado: PG, competencia, espacios de conjuro y rasgos de clase. |
+| **Combate** | Iniciativa, turnos y rondas, daño y curación, estados con **duración en rondas** y monstruos ocultos. Tira sola la salvación de **concentración** cuando hace falta. Calcula la dificultad del encuentro. Los jugadores ven «Herido» o «Malherido» en lugar de los PG de los monstruos. |
 | **Compendio** | El SRD 5.2.1 con la traducción oficial al castellano: 330 criaturas, 339 conjuros, objetos mágicos, estados, equipo, clases y reglas. Preparador de encuentros y monstruos propios. |
 | **Diario** | Un diario de sesiones que escribe toda la mesa, y documentos (cartas, pistas, imágenes) que el máster enseña cuando quiere. |
-| **Máster** | Generadores de nombres, PNJ, tabernas, botín y encuentros, tablas aleatorias propias y notas secretas. |
-| **Partidas** | Varias partidas guardadas, una partida de ejemplo y la contraseña del máster. |
+| **Máster** | Generadores de nombres, PNJ, tabernas, botín y encuentros, tablas aleatorias propias, notas secretas y **música y ambiente** (lluvia, tormenta, hoguera, cueva… y tus pistas). |
+| **Partidas** | Varias partidas guardadas, **copias de seguridad automáticas**, **exportar e importar** partidas en un `.zip`, dos partidas de ejemplo y la contraseña del máster. |
 
-Además: **dados** compartidos con ventaja, desventaja y tiradas secretas, entrada con **QR**, **modo oscuro** y adaptado al **móvil**. Todo el programa está en **castellano y valenciano**, y cada jugador elige su idioma.
+Además: **dados** compartidos con ventaja, desventaja y tiradas secretas, un **lápiz** para dibujar sobre el mapa, entrada con **QR**, **modo oscuro** y adaptado al **móvil**. Si se pierde la conexión, lo avisa y guarda los cambios cuando vuelve. Todo el programa está en **castellano y valenciano**, y cada jugador elige su idioma.
 
 ## Capturas
 
@@ -105,7 +105,9 @@ quadern-del-mestre --idioma es             # la ventana en castellano (por defec
 | Linux, con el `.deb` | `~/.local/share/quadern-del-mestre` |
 | Windows portable, `.tar.gz` o `python3 quadern.py` | La carpeta del programa |
 
-Cada partida se guarda en `partides/<nombre>.json`, y sus imágenes en `partides/<nombre>-fitxers/`. Los jugadores, las sesiones y la contraseña del máster van a `quadern.json`. Para hacer una copia de seguridad, copia la carpeta entera; el botón **Carpeta de partidas** de la ventana la abre directamente. Al desinstalar, las partidas no se borran.
+Cada partida se guarda en `partides/<nombre>.json`, y sus imágenes y sonidos en `partides/<nombre>-fitxers/`. Los jugadores, las sesiones y la contraseña del máster van a `quadern.json`. El botón **Carpeta de partidas** de la ventana abre la carpeta. Al desinstalar, las partidas no se borran.
+
+El Quadern hace **copias de seguridad** solo en `copies/`: una cada vez que se abre una partida y una cada media hora mientras se juega (guarda las 15 últimas). Se restauran desde **Partidas → Copias**. Para pasar una partida a otro ordenador, **Exportar** e **Importar una partida**.
 
 ## Documentación
 
@@ -122,17 +124,18 @@ Solo hace falta **Python 3.8 o más nuevo**, sin dependencias. `quadern.py` se g
 
 | Archivo | Qué hay |
 |---|---|
-| `src/servidor.py` | El servidor: permisos del máster, niebla de guerra, imágenes y dónde se guardan los datos |
+| `src/servidor.py` | El servidor: permisos del máster, niebla de guerra y línea de visión, imágenes y sonidos, copias, exportar e importar |
 | `src/finestra.py` | La ventanita con la dirección, el QR y la contraseña (Tk) |
 | `src/qr.py` | El generador de códigos QR |
 | `src/srd/srd-es.json.gz` | El compendio SRD 5.2.1 en castellano |
 | `src/web/nucli.js`, `daus.js` | Utilidades, idioma, conexión, ventanas y dados |
 | `src/web/mapa.js` | El editor de mapas |
 | `src/web/fitxes.js`, `combat.js`, `compendi.js` | Fichas, combate y compendio |
-| `src/web/diari.js`, `master.js`, `partides.js` | Diario y documentos, pestaña del máster, partidas |
+| `src/web/diari.js`, `master.js`, `so.js`, `partides.js` | Diario y documentos, pestaña del máster, música y ambiente, partidas |
 | `src/web/dades.js` | Reglas: habilidades, estados, clases, espacios de conjuro, PX, generadores |
 | `src/web/i18n.js` | Las traducciones al castellano (para añadir un idioma, copia el bloque `es`) |
 | `docs/` | Los manuales en Markdown y las capturas |
+| `tests/` | Las pruebas automáticas del servidor |
 | `paquets/` | El instalador de Windows (Inno Setup) y los archivos del menú de Linux |
 | `eines/` | Comprobar traducciones, hacer los manuales en PDF, los paquetes de Linux y la web |
 
@@ -141,6 +144,7 @@ Después de cambiar algo:
 ```bash
 python3 build.py                          # vuelve a generar quadern.py
 python3 eines/comprova-traduccions.py     # comprueba que no falta ninguna traducción
+python3 tests/prova_servidor.py           # pruebas: permisos, niebla, copias, exportar e importar…
 python3 quadern.py                        # pruébalo
 ```
 
@@ -153,6 +157,8 @@ python3 eines/web.py _site                # genera la web
 ```
 
 ## Publicar una versión
+
+Cada cambio que se sube a `main` pasa las pruebas en Windows y Linux ([`.github/workflows/proves.yml`](.github/workflows/proves.yml)).
 
 GitHub lo hace todo solo con [`.github/workflows/publica.yml`](.github/workflows/publica.yml): prueba el programa, hace el instalador y el portable de Windows, el `.deb` y el `.tar.gz` de Linux y los manuales en PDF, y lo publica en [Releases](../../releases).
 
@@ -170,7 +176,7 @@ La [web](https://jossanmar9.github.io/quadern-del-mestre/es/) se publica sola co
 
 ## Colaborar
 
-Las propuestas de mejora y las correcciones son bienvenidas. Si has encontrado un error o tienes una idea, abre una [incidencia](../../issues).
+Las propuestas de mejora y las correcciones son bienvenidas. Si has encontrado un error o tienes una idea, abre una [incidencia](../../issues/new/choose): hay un formulario para errores y otro para propuestas, en castellano y valenciano.
 
 ## Uso de inteligencia artificial
 

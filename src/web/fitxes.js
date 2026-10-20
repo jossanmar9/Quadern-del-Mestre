@@ -72,6 +72,7 @@ function sheetHtml(c) {
         <label class="field"><span>${esc(t('Trasfons'))}</span>${sel('background', [...BACKGROUNDS, ['', L('Un altre')]], BACKGROUNDS.some(s => s[0] === c.background) ? c.background : '')}</label>
         <label class="field"><span>${esc(t('Alineament'))}</span>${sel('alignment', [['', '—'], ...ALIGN.map(a => [a, a])], c.alignment)}</label>
         <label class="field"><span>${esc(t('PX'))}</span>${inp('xp', c.xp, 'number', 'min="0"')}</label>
+        ${ed && k.lv < 20 ? `<div class="field lvl-f"><span>${xpReady(c) ? esc(t('Ja pot pujar!')) : '&nbsp;'}</span><button class="btn sm${xpReady(c) ? ' pri' : ''}" id="c-lvlup">⬆ ${esc(t('Pujar de nivell'))}</button></div>` : ''}
         <div class="field"><span>${esc(t('Color'))}</span><div class="swatches">${TOKEN_COLORS.map(col => `<button class="sw" style="background:${col}" data-color="${col}" aria-pressed="${c.color === col}" ${dis} aria-label="${col}"></button>`).join('')}</div></div>
       </div>
     </div>
@@ -178,6 +179,7 @@ document.addEventListener('click', async e => {
   const pr = x.closest('[data-prof]'); if (pr) {const k = pr.dataset.prof; charWrite(id, 'skills.' + k, ((c.skills?.[k] || 0) + 1) % 3); return}
   const hpb = x.closest('[data-hp]'); if (hpb) {const n = Math.abs(+$('#hp-amt').value || 0); if (!n) {$('#hp-amt').focus(); return} applyHpChar(c, hpb.dataset.hp, n); $('#hp-amt').value = ''; return}
   if (x.closest('#rest-long')) {longRest(c); return}
+  if (x.closest('#c-lvlup')) {levelUpModal(c); return}
   if (x.closest('#rest-short')) {shortRest(c); return}
   const cd = x.closest('[data-cond]'); if (cd) {const s = new Set(c.conds || []); s.has(cd.dataset.cond) ? s.delete(cd.dataset.cond) : s.add(cd.dataset.cond); write('characters/' + id, {conds: [...s]}, 'update'); return}
   const ex = x.closest('[data-exh]'); if (ex) {charWrite(id, 'exh', +ex.dataset.exh); return}
@@ -230,6 +232,11 @@ function applyHpChar(c, mode, n) {
   else upd.hp = Math.min(c.maxHp || 0, (c.hp || 0) + n);
   if (upd.hp > 0) upd.death = [0, 0];
   write('characters/' + c.id, upd, 'update');
+  if (+mode < 0 && n > 0 && (c.conds || []).includes('conc')) {
+    const down = upd.hp != null && upd.hp <= 0;
+    concCheck({name: c.name, mod: charCalc(c).save('con'), dmg: n, down, priv: false,
+      drop: () => {const ch = getDoc('characters/' + c.id); if (ch) write('characters/' + c.id, {conds: (ch.conds || []).filter(k => k !== 'conc')}, 'update')}});
+  }
 }
 function longRest(c) {
   const k = charCalc(c), slots = {};
@@ -244,12 +251,57 @@ function shortRest(c) {
   if (!r) return;
   write('characters/' + c.id, {hp: Math.min(c.maxHp, (c.hp || 0) + Math.max(1, r.total)), hdUsed: (c.hdUsed || 0) + 1, pact: {...(c.pact || {}), used: 0}}, 'update');
 }
-function fillSlots(c) {
-  const cl = CLASSES.find(x => x[0] === c.cls); if (!cl) return; const lv = clamp(+c.level || 1, 1, 20);
-  if (cl[4] === 'pact') {const [n, sl] = SLOTS_PACT[lv]; write('characters/' + c.id, {pact: {max: n, used: 0, lvl: sl}}, 'update'); return}
+/** Els espais de conjur que li toquen a la classe en un nivell (null si la classe no en té) */
+function slotsFor(c, lvIn) {
+  const cl = CLASSES.find(x => x[0] === c.cls); if (!cl || !cl[4]) return null; const lv = clamp(lvIn, 1, 20);
+  if (cl[4] === 'pact') {const [n, sl] = SLOTS_PACT[lv]; return {pact: {max: n, used: Math.min(c.pact?.used || 0, n), lvl: sl}}}
   const tb = cl[4] === 'full' ? SLOTS_FULL : SLOTS_HALF, slots = {};
   for (let i = 1; i <= 9; i++) slots[i] = {max: tb[lv][i - 1] || 0, used: Math.min(c.slots?.[i]?.used || 0, tb[lv][i - 1] || 0)};
-  write('characters/' + c.id, {slots}, 'update');
+  return {slots};
+}
+function fillSlots(c) {const u = slotsFor(c, +c.level || 1); if (u) write('characters/' + c.id, u, 'update')}
+const slotsText = u => !u ? '' : u.pact ? t('{n} espais de pacte de nivell {l}', {n: u.pact.max, l: u.pact.lvl}) : Object.entries(u.slots).filter(([, v]) => v.max).map(([l, v]) => `${v.max}×${l}`).join(' · ') || '—';
+const xpReady = c => {const lv = clamp(+c.level || 1, 1, 20); return lv < 20 && (+c.xp || 0) >= XP_LEVELS[lv + 1]};
+/** Els trets de classe d'un nivell, de la taula de la classe al compendi (en castellà, com tot el SRD) */
+function classFeatures(cls, lv) {
+  const e = srdGet('clase', cls); if (!e) return null;
+  const tb = (e.e.bloques || []).find(b => b.t === 'tabla' && /^Rasgos de/i.test(b.titulo || '')); if (!tb) return null;
+  const head = tb.filas[0] || [], col = head.findIndex(h => /Rasgos de clase/i.test(h)); const row = tb.filas.find(r => r[0] === String(lv));
+  return row && col >= 0 ? row[col] : null;
+}
+async function levelUpModal(c) {
+  const k = charCalc(c), nl = k.lv + 1; if (nl > 20) return;
+  try {await loadSRD()} catch (_) {}
+  const con = k.mods.con, avg = Math.floor(k.hd / 2) + 1, pbNew = profBonus(nl);
+  const oldS = slotsFor(c, k.lv), newS = slotsFor(c, nl), feats = classFeatures(c.cls, nl), need = XP_LEVELS[nl];
+  openModal(`<h2>${esc(t('{n} puja a nivell {l}', {n: c.name || t('Sense nom'), l: nl}))}</h2>
+    ${(+c.xp || 0) < need ? `<p class="small muted" style="margin:0">${esc(t('Encara no té els PX del nivell {l} ({x} de {y}). Si jugueu per fites, pots pujar-lo igualment.', {l: nl, x: +c.xp || 0, y: need}))}</p>` : ''}
+    <h3>${esc(t('Punts de golpe'))}</h3>
+    <label class="check"><input type="radio" name="lu-hp" value="avg" checked> ${esc(t('Valor fix: +{n} PG ({a} del dau i {c} de Constitució)', {n: Math.max(1, avg + con), a: avg, c: sgn(con)}))}</label>
+    <label class="check"><input type="radio" name="lu-hp" value="roll"> ${esc(t('Tirar 1d{d}{m}', {d: k.hd, m: con ? sgn(con) : ''}))}</label>
+    <ul class="lu-list">
+      <li>${esc(t('Punts de golpe màxims'))}: <b>${esc(c.maxHp || 0)}</b> → <b id="lu-max">${(+c.maxHp || 0) + Math.max(1, avg + con)}</b></li>
+      <li>${esc(t('Daus de golpe'))}: ${k.lv}d${k.hd} → <b>${nl}d${k.hd}</b></li>
+      ${pbNew !== k.pb ? `<li>${esc(t('Bonificador de competència'))}: ${sgn(k.pb)} → <b>${sgn(pbNew)}</b></li>` : ''}
+      ${newS ? `<li>${esc(t('Espais de conjur'))}: ${esc(slotsText(oldS))} → <b>${esc(slotsText(newS))}</b></li>` : ''}
+    </ul>
+    ${newS ? `<label class="check"><input type="checkbox" id="lu-slots" checked> ${esc(t('Actualitzar els espais de conjur'))}</label>` : ''}
+    ${feats ? `<h3>${esc(t('Trets de classe del nivell {l}', {l: nl}))}</h3><p class="lu-feats">${srdHtml(feats)}</p><p class="small muted" style="margin:0">${esc(t('Apunta els trets nous a «Trets i notes». Si toca una millora de característica o una subclasse, fes-ho a la fitxa.'))}</p>
+      <button class="btn sm" id="lu-class" style="align-self:flex-start">${esc(t('Veure la classe al compendi'))}</button>` : ''}
+    <div class="foot"><button class="btn" id="lu-x">${esc(t('Cancel·lar'))}</button><button class="btn pri" id="lu-ok">${esc(t('Pujar a nivell {l}', {l: nl}))}</button></div>`, (m, close) => {
+    $$('[name=lu-hp]', m).forEach(r => r.onchange = () => {$('#lu-max', m).textContent = r.value === 'avg' ? (+c.maxHp || 0) + Math.max(1, avg + con) : t('{n} + la tirada', {n: c.maxHp || 0})});
+    $('#lu-x', m).onclick = close;
+    if ($('#lu-class', m)) $('#lu-class', m).onclick = () => {close(); showEntry('clase', c.cls)};
+    $('#lu-ok', m).onclick = () => {
+      let gain = Math.max(1, avg + con);
+      if ($('[name=lu-hp]:checked', m).value === 'roll') {const r = doRoll(M('{n}: punts de golpe del nivell {l}', {n: c.name, l: nl}), `1d${k.hd}${con ? sgn(con).replace('−', '-') : ''}`, {adv: '', quiet: true}); if (!r) return; gain = Math.max(1, r.total)}
+      const cur = getDoc('characters/' + c.id) || c;
+      const upd = {level: nl, maxHp: (+cur.maxHp || 0) + gain, hp: (+cur.hp || 0) + gain};
+      if (newS && $('#lu-slots', m)?.checked) Object.assign(upd, slotsFor(cur, nl));
+      write('characters/' + c.id, upd, 'update'); close();
+      toast(t('{n} ja és de nivell {l}! +{g} PG.', {n: c.name, l: nl, g: gain}), 6000); setTimeout(renderChars, 40);
+    };
+  });
 }
 function rollAttack(c, a, kind) {
   const nm = a.name || t('Atac');

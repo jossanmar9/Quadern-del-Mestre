@@ -237,3 +237,28 @@
 #dj-body .camp{grid-template-columns:minmax(0,280px) minmax(0,1fr)}
 @media (max-width:640px){#dj-body .camp{grid-template-columns:minmax(0,1fr)}}
 @media (min-width:1001px){.dice-fab{display:none!important}}
+
+/* v1.3: estats amb durada, pujar de nivell, còpies, exemples i música */
+.cond.chip2{display:inline-flex;align-items:stretch;padding:0;overflow:hidden}
+.cond.chip2 button{border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:3px 6px 3px 8px}
+.cond.chip2 .cond-x{padding:3px 7px;border-left:1px solid color-mix(in srgb,var(--blood) 40%,transparent)}
+.cond.chip2 button:hover{background:var(--accent-soft)}
+.cond .dur{display:inline-block;min-width:16px;margin-left:3px;padding:0 4px;border-radius:999px;background:var(--blood);color:var(--accent-ink);font-size:11px;text-align:center}
+.lvl-f{justify-content:flex-end}
+.lvl-f>span{color:var(--good);font-weight:600}
+.lu-list{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.lu-feats{margin:0;padding:10px 12px;border-left:3px solid var(--gold);background:var(--gold-soft);border-radius:var(--r)}
+.bk-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
+.bk-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2)}
+.ex-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.ex-list>div{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.ex-list p{margin:0}
+.ms-audio{grid-column:1/-1}
+.snd-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:24px}
+.snd-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.snd-list li{display:flex;align-items:center;gap:8px;min-width:0}
+.snd-list li>.btn:first-child{min-width:44px}
+.snd-list [data-amb]{min-width:150px;justify-content:flex-start}
+.snd-list input[type=range]{flex:1;min-width:70px;max-width:180px;accent-color:var(--accent)}
+.trk-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:760px){.snd-grid{grid-template-columns:minmax(0,1fr)}}

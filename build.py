@@ -14,7 +14,7 @@ WEB = ROOT / "src" / "web"
 
 # L'ordre importa: primer les dades i el nucli, després cada secció de l'app.
 SCRIPTS = ["i18n.js", "dades.js", "nucli.js", "daus.js", "fitxes.js", "mapa.js", "combat.js",
-           "compendi.js", "diari.js", "master.js", "partides.js", "arrencada.js"]
+           "compendi.js", "diari.js", "master.js", "so.js", "partides.js", "arrencada.js"]
 
 
 def read(name):

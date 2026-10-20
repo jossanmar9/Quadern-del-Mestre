@@ -61,7 +61,7 @@ function armed(btn, fn, label) {
   btn.dataset.armed = '1'; const old = btn.textContent; btn.textContent = label || t('Prem de nou per a confirmar');
   setTimeout(() => {if (btn.isConnected && btn.dataset.armed) {delete btn.dataset.armed; btn.textContent = old}}, 4000);
 }
-function showBanner(x) {const b = $('#banner'); b.textContent = x; b.hidden = !x}
+function showBanner(x, kind) {const b = $('#banner'); b.textContent = x; b.hidden = !x; b.classList.toggle('off', kind === 'off')}
 
 /* ================= dades compartides ================= */
 const S = {uid: null, token: null, camp: null, dm: false, es: null};
@@ -97,14 +97,25 @@ function write(path, data, mode = 'set') {
   else q.next = {mode, data: clone(data)};
   if (!q.busy) flush(path, q);
 }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+/** Canvis que no han arribat al servidor perquè no hi ha connexió: es tornen a enviar fins que arriben. */
+const pendingNet = new Set();
+/** Si mentre s'esperava hi ha un canvi nou al mateix document, s'ajunten (el més nou mana). */
+function combineWrites(old, nw) {
+  if (nw.mode !== 'update') return nw;
+  if (old.mode === 'update') return {mode: 'update', data: deepMerge(old.data, nw.data)};
+  if (old.mode === 'set') return {mode: 'set', data: deepMerge(old.data, nw.data)};
+  return nw;
+}
 async function flush(path, q) {
   q.busy = true;
   while (q.next) {
-    const {mode, data} = q.next; q.next = null;
-    try {await doWrite(path, mode, data)} catch (e) {
+    const job = q.next; q.next = null;
+    try {await doWrite(path, job.mode, job.data); if (pendingNet.delete(path) && !pendingNet.size) netBack()} catch (e) {
       if (e && e.code === 'perm') continue;
-      await new Promise(r => setTimeout(r, 500));
-      try {await doWrite(path, mode, data)} catch (e2) {if (!e2 || e2.code !== 'perm') toast(t("No s'ha pogut guardar. Comprova la connexió amb el servidor."))}
+      if (e && e.code === 'net') {pendingNet.add(path); netLost(); await sleep(2500); q.next = q.next ? combineWrites(job, q.next) : job; continue}
+      await sleep(500);
+      try {await doWrite(path, job.mode, job.data)} catch (e2) {if (!e2 || e2.code !== 'perm') toast(t("No s'ha pogut guardar. Comprova la connexió amb el servidor."))}
     }
   }
   q.busy = false;

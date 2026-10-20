@@ -1,0 +1,35 @@
+# Comprova cada canvi que es puja a main: que quadern.py es genera, que no falta cap traducció
+# i que passen les proves del servidor (permisos, boira, còpies, exportar i importar…).
+name: Proves
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proves:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.8", "3.13"]
+        exclude:
+          - os: windows-latest
+            python: "3.8"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Genera quadern.py
+        run: python build.py
+      - name: Comprova les traduccions
+        run: python eines/comprova-traduccions.py
+      - name: Proves del servidor
+        run: python tests/prova_servidor.py

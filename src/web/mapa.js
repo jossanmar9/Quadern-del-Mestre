@@ -1,11 +1,11 @@
 /*
  * Quadern del Mestre — editor de mapes: imatge de fons, quadrícula, terreny, parets i portes,
- * etiquetes, boira de guerra, fitxes, regle, àrees d'efecte i avisos (ping).
+ * etiquetes, boira de guerra (manual o automàtica), fitxes, regle, àrees d'efecte, llapis i avisos (ping).
  * Llicència GPL-3.0 o posterior.
  */
 const CS = 48;   // píxels per casella amb zoom 1
 const mp = {sel: lsGet('qm-map') || null, tool: 'move', terrain: 'floor', brush: 1, paintMode: 'brush', wall: 'wall', fogMode: 'reveal',
-  labelKind: 'pin', aoeShape: 'circle', aoeSize: 6, views: {}, tokSel: null, drag: null, hover: null, ruler: null, pings: [], undo: [],
+  labelKind: 'pin', aoeShape: 'circle', aoeSize: 6, views: {}, tokSel: null, drag: null, hover: null, ruler: null, pings: [], strokes: [], undo: [],
   imgs: {}, colors: null, cv: null, ctx: null, ro: null, dirty: false, local: null, pointers: new Map(), panel: lsGet('qm-map-panel') || 'eines'};
 const mapId = () => dm() ? (mp.sel && getDoc('maps/' + mp.sel) ? mp.sel : (camp().activeMap && getDoc('maps/' + camp().activeMap) ? camp().activeMap : col('maps')[0]?.id)) : camp().activeMap;
 const mapDoc = () => {const id = mapId(); return id ? (mp.local && mp.local.id === id ? mp.local.doc : getDoc('maps/' + id)) : null};
@@ -33,7 +33,7 @@ function renderMap() {
       : `<div class="empty"><b>${esc(t('Encara no hi ha mapa'))}</b>${esc(t('El màster encara no ha ensenyat cap mapa. Mentrestant, pots preparar la teua fitxa.'))}</div>`;
     return;
   }
-  const tools = [['move', L('Moure'), '✋'], ['ruler', L('Regle'), '📏'], ['aoe', L('Àrea'), '◎'], ['ping', L('Avisar'), '❗']];
+  const tools = [['move', L('Moure'), '✋'], ['ruler', L('Regle'), '📏'], ['aoe', L('Àrea'), '◎'], ['draw', L('Llapis'), '✎'], ['ping', L('Avisar'), '❗']];
   const dmTools = [['paint', L('Terreny'), '▦'], ['wall', L('Parets'), '▯'], ['label', L('Etiquetes'), '①'], ['fog', L('Boira'), '☁']];
   if (!dm() && !tools.some(x => x[0] === mp.tool)) mp.tool = 'move';
   $('#main').innerHTML = `<div class="map-layout">
@@ -58,11 +58,15 @@ function toolOptions() {
   if (T === 'label') return `<h3>${esc(t('Etiquetes'))}</h3><div class="seg2">${[['pin', L('Número de sala')], ['text', L('Text')]].map(([k, lb]) => `<button data-lkind="${k}" aria-pressed="${mp.labelKind === k}">${esc(t(lb))}</button>`).join('')}</div><p class="small muted">${esc(t('Fes clic al mapa per a posar-ne una. Fes clic damunt d\'una per a canviar-la o llevar-la.'))}</p>`;
   if (T === 'fog') {const f = mapDoc()?.fog || {}; return `<h3>${esc(t('Boira de guerra'))}</h3><label class="check"><input type="checkbox" id="fog-on" ${f.on ? 'checked' : ''}> ${esc(t('Activada'))}</label>
     <div class="seg2">${[['reveal', L('Revelar')], ['hide', L('Amagar')]].map(([k, lb]) => `<button data-fmode="${k}" aria-pressed="${mp.fogMode === k}">${esc(t(lb))}</button>`).join('')}</div>
-    <p class="small muted">${esc(t('Arrossega per a fer un rectangle. Tu veus la boira transparent; els jugadors no veuen res del que hi ha davall.'))}</p><div class="row"><button class="btn sm" id="fog-all">${esc(t('Revelar-ho tot'))}</button><button class="btn sm" id="fog-none">${esc(t('Amagar-ho tot'))}</button></div>`}
+    <p class="small muted">${esc(t('Arrossega per a fer un rectangle. Tu veus la boira transparent; els jugadors no veuen res del que hi ha davall.'))}</p><div class="row"><button class="btn sm" id="fog-all">${esc(t('Revelar-ho tot'))}</button><button class="btn sm" id="fog-none">${esc(t('Amagar-ho tot'))}</button></div>
+    <h3>${esc(t('Boira automàtica'))}</h3><label class="check"><input type="checkbox" id="fog-auto" ${f.auto ? 'checked' : ''}> ${esc(t('Revelar el que veuen els personatges'))}</label>
+    ${f.auto ? `<label class="field"><span>${esc(t('Distància de visió (m)'))}</span><input class="in" type="number" id="fog-dist" min="1.5" max="45" step="1.5" value="${esc(f.dist || 18)}"></label>` : ''}
+    <p class="small muted">${esc(t('Quan un personatge jugador es mou, es revela el que veu des de la seua fitxa. Les parets, les portes tancades, la roca i els arbres tapen la vista. El que ja s\'ha vist queda revelat.'))}</p>`}
   if (T === 'aoe') return `<h3>${esc(t('Àrea d\'efecte'))}</h3><div class="seg2 wrap">${[['circle', L('Esfera')], ['cone', L('Con')], ['line', L('Línia')], ['cube', L('Cub')]].map(([k, lb]) => `<button data-shape="${k}" aria-pressed="${mp.aoeShape === k}">${esc(t(lb))}</button>`).join('')}</div>
     <label class="field"><span>${esc(t('Mida (m)'))}</span><input class="in" type="number" id="aoe-size" min="1.5" step="1.5" value="${mp.aoeSize}"></label><p class="small muted">${esc(t('Arrossega des del punt d\'origen. Fes clic damunt d\'una àrea per a llevar-la.'))}</p>
     ${aoes().length ? `<button class="btn sm" id="aoe-clear">${esc(t(dm() ? 'Llevar totes les àrees' : 'Llevar les meues àrees'))}</button>` : ''}`;
   if (T === 'ruler') return `<h3>${esc(t('Regle'))}</h3><p class="small muted">${esc(t('Arrossega per a mesurar. Cada casella són {n} m, també en diagonal.', {n: String(mapDoc()?.units || 1.5).replace('.', ',')}))}</p>`;
+  if (T === 'draw') return `<h3>${esc(t('Llapis'))}</h3><p class="small muted">${esc(t('Dibuixa damunt del mapa per a assenyalar un camí o explicar un pla. Tothom ho veu, i s\'esborra sol al cap d\'uns segons.'))}</p>`;
   if (T === 'ping') return `<h3>${esc(t('Avisar'))}</h3><p class="small muted">${esc(t('Fes clic en un punt del mapa i tothom el veurà ressaltat uns segons.'))}</p>`;
   return `<h3>${esc(t('Moure'))}</h3><p class="small muted">${esc(dm() ? t('Arrossega les fitxes per a moure-les i el fons per a desplaçar el mapa. Roda o pessic per a fer zoom. Doble clic: avisar.') : t('Pots moure les fitxes dels teus personatges. Arrossega el fons per a desplaçar el mapa. Doble clic: avisar.'))}</p>`;
 }
@@ -193,11 +197,20 @@ function draw(tg) {
   if (mp.hover && ['paint', 'fog', 'label'].includes(mp.tool) && !mp.drag) {const n = mp.tool === 'paint' && mp.paintMode === 'brush' ? mp.brush : 1, o = Math.floor((n - 1) / 2); ctx.strokeStyle = C['--gold']; ctx.lineWidth = 2; ctx.strokeRect((Math.floor(mp.hover.x) - o) * s, (Math.floor(mp.hover.y) - o) * s, n * s, n * s)}
   if (mp.hover && mp.tool === 'wall' && !mp.drag) {const e = nearestEdge(mp.hover); if (e) drawWall(ctx, e, mp.wall || 'wall', s, C, true, .5)}
   if (mp.ruler) drawRuler(ctx, mp.ruler, s, m, C);
+  // llapis: els traços s'esvaeixen sols
+  const now = Date.now(); mp.strokes = mp.strokes.filter(k => now - k.ts < STROKE_LIFE && k.map === mapId());
+  const live = mp.drag?.kind === 'draw' ? [{pts: mp.drag.pts, col: mp.drag.col, ts: now}] : [];
+  for (const k of [...mp.strokes, ...live]) {
+    const age = now - k.ts; ctx.globalAlpha = age < STROKE_LIFE - 2500 ? .95 : Math.max(0, (STROKE_LIFE - age) / 2500) * .95;
+    ctx.strokeStyle = k.col || C['--accent']; ctx.lineWidth = Math.max(3, s * .09); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+    k.pts.forEach(([x, y], i) => i ? ctx.lineTo(x * s, y * s) : ctx.moveTo(x * s, y * s)); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
   // avisos
-  const now = Date.now(); mp.pings = mp.pings.filter(p => now - p.ts < 2600 && p.map === mapId());
+  mp.pings = mp.pings.filter(p => now - p.ts < 2600 && p.map === mapId());
   for (const p of mp.pings) {const k = (now - p.ts) / 2600; for (let i = 0; i < 3; i++) {const r = ((k * 2 + i / 3) % 1); ctx.strokeStyle = p.dm ? C['--accent'] : C['--gold']; ctx.globalAlpha = (1 - r) * (1 - k * .5); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x * s, p.y * s, s * (.2 + r * 1.3), 0, 7); ctx.stroke()} ctx.globalAlpha = 1}
   ctx.restore();
-  if (mp.pings.length) drawSoon();
+  if (mp.pings.length || mp.strokes.length) drawSoon();
 }
 function drawWall(ctx, k, w, s, C, dmv, alpha = 1) {
   const [xs, ys, dd] = k.split(','); const x = +xs, y = +ys;
@@ -277,8 +290,8 @@ function nearestEdge(p) {
   if (opts[0][0] > .3) return null; const [ex, ey] = opts[0][1].split(',').map(Number);
   if (ex < 0 || ey < 0 || ex > m.cols || ey > m.rows) return null; return opts[0][1];
 }
-function cursorFor() {return {move: 'grab', ruler: 'crosshair', aoe: 'crosshair', ping: 'pointer', paint: 'cell', wall: 'crosshair', label: 'text', fog: 'cell'}[mp.tool] || 'default'}
-function updateHint() {const h = $('#map-hint'); if (!h) return; const m = mapDoc(); h.textContent = m?.fog?.on && dm() ? t('Boira activada: els jugadors només veuen les zones revelades.') : ''; h.hidden = !h.textContent}
+function cursorFor() {return {move: 'grab', ruler: 'crosshair', aoe: 'crosshair', draw: 'crosshair', ping: 'pointer', paint: 'cell', wall: 'crosshair', label: 'text', fog: 'cell'}[mp.tool] || 'default'}
+function updateHint() {const h = $('#map-hint'); if (!h) return; const m = mapDoc(); h.textContent = m?.fog?.on && dm() ? t(m.fog.auto ? 'Boira automàtica: es revela el que veuen els personatges.' : 'Boira activada: els jugadors només veuen les zones revelades.') : ''; h.hidden = !h.textContent}
 
 /* ---------- edició local del mapa (amb desfer) ---------- */
 function beginEdit() {const id = mapId(), doc = clone(getDoc('maps/' + id)); mp.undo.push({id, doc: clone(doc)}); if (mp.undo.length > 25) mp.undo.shift(); mp.local = {id, doc}; return doc}
@@ -329,6 +342,7 @@ function onDown(e) {
   }
   if (T === 'ruler') {mp.ruler = {a: p, b: p}; mp.drag = {kind: 'ruler'}; drawSoon(); return}
   if (T === 'ping') {sendPing(p.x, p.y); return}
+  if (T === 'draw') {mp.drag = {kind: 'draw', pts: [[p.x, p.y]], col: myColor()}; drawSoon(); return}
   if (T === 'aoe') {
     const hit = aoes().find(a => inAoe(a, aoeGeom(a, m), p.x, p.y) && (dm() || a.ownerId === S.uid));
     if (hit) {del(`maps/${mapId()}/aoe/${hit.id}`); return}
@@ -353,6 +367,7 @@ function onMove(e) {
   if (d.kind === 'pan') {const v = view(); v.x = d.vx + e.clientX - d.sx; v.y = d.vy + e.clientY - d.sy; v.fit = false; drawSoon(); return}
   if (d.kind === 'token') {const m = mapDoc(), tk = tokens().find(x => x.id === d.id); const n = tk?.size || 1; d.pos = {x: clamp(Math.round(p.x - d.off.x), 0, m.cols - n), y: clamp(Math.round(p.y - d.off.y), 0, m.rows - n)}; d.moved = true; drawSoon(); return}
   if (d.kind === 'ruler') {mp.ruler.b = p; drawSoon(); return}
+  if (d.kind === 'draw') {const l = d.pts.at(-1); if (d.pts.length < 600 && Math.hypot(p.x - l[0], p.y - l[1]) > .08) {d.pts.push([p.x, p.y]); drawSoon()} return}
   if (d.kind === 'aoe') {const a = d.aoe; a.dx = p.x - a.x; a.dy = p.y - a.y; if (a.shape === 'circle') {} drawSoon(); return}
   if (d.kind === 'paint') {paintAt(mp.local.doc, p); drawSoon(); return}
   if (d.kind === 'rect') {d.b = p; drawSoon(); return}
@@ -364,6 +379,7 @@ function onUp(e) {
   if (d.kind === 'pinch') {return}
   if (d.kind === 'token') {if (d.moved) write(`maps/${mapId()}/tokens/${d.id}`, {x: d.pos.x, y: d.pos.y}, 'update'); drawSoon(); return}
   if (d.kind === 'ruler') {setTimeout(() => {if (!mp.drag) {mp.ruler = null; drawSoon()}}, 1800); return}
+  if (d.kind === 'draw') {if (d.pts.length > 1) {const k = {map: mapId(), pts: d.pts.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]), col: d.col, ts: Date.now()}; mp.strokes.push(k); if (S.token) api('api/draw', k).catch(() => {})} drawSoon(); return}
   if (d.kind === 'aoe') {const a = d.aoe; if (Math.hypot(a.dx, a.dy) < .2 && a.shape !== 'circle') {a.dx = 1; a.dy = 0} write(`maps/${mapId()}/aoe/${newId()}`, a); drawSoon(); return}
   if (d.kind === 'paint' || d.kind === 'wall') {commitEdit(); return}
   if (d.kind === 'rect') {
@@ -376,6 +392,10 @@ function onUp(e) {
 function zoomAt(sx, sy, f) {const v = view(), r = mp.cv.getBoundingClientRect(), px = sx - r.left, py = sy - r.top, nz = clamp(v.z * f, .1, 4); v.x = px - (px - v.x) * nz / v.z; v.y = py - (py - v.y) * nz / v.z; v.z = nz; v.fit = false; drawSoon()}
 function onWheel(e) {e.preventDefault(); if (e.ctrlKey || Math.abs(e.deltaY) > Math.abs(e.deltaX)) zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .0015))); else {const v = view(); v.x -= e.deltaX; v.fit = false; drawSoon()}}
 function sendPing(x, y) {const p = {x, y, map: mapId(), uid: S.uid, dm: dm(), ts: Date.now()}; mp.pings.push(p); drawSoon(); if (S.token) api('api/ping', p).catch(() => {})}
+const STROKE_LIFE = 9000;
+/** El color del llapis: el del teu personatge (el màster, el color de la partida) */
+function myColor() {if (dm()) return ''; const ch = chars().find(c => c.ownerId === S.uid && !c.npc); return ch?.color || ''}
+function onDraw(k) {if (k.uid === S.uid) return; k.ts = Date.now(); mp.strokes.push(k); if (st.tab === 'mapa') drawSoon()}
 function onPing(p) {if (p.uid === S.uid) return; p.ts = Date.now(); mp.pings.push(p); if (st.tab === 'mapa') drawSoon(); else if (p.map === mapId()) toast(t('{n} assenyala alguna cosa al mapa.', {n: userName(p.uid)}))}
 function labelAt(p) {
   const m = mapDoc(), x = Math.floor(p.x), y = Math.floor(p.y);
@@ -462,6 +482,9 @@ document.addEventListener('change', e => {
   if (x.id === 'map-pick') {mp.sel = x.value; lsSet('qm-map', x.value); mp.tokSel = null; mp.undo = []; renderMap(); return}
   if (x.id === 'brush-size') {mp.brush = +x.value; return}
   if (x.id === 'fog-on') {const doc = beginEdit(); doc.fog = {rev: {}, ...(doc.fog || {}), on: x.checked}; commitEdit(); drawSoon(); updateHint(); return}
+  if (x.id === 'fog-auto') {write('maps/' + mapId(), {fog: x.checked ? {auto: true, on: true, dist: mapDoc()?.fog?.dist || 18} : {auto: false}}, 'update'); setTimeout(() => {renderMapSide(); updateHint()}, 60);
+    if (x.checked) toast(t('Boira automàtica activada: es revelarà el que veuen els personatges quan es moguen.'), 5000); return}
+  if (x.id === 'fog-dist') {write('maps/' + mapId(), {fog: {dist: clamp(+x.value || 18, 1.5, 45)}}, 'update'); return}
   if (x.dataset.mfb) {write('maps/' + mapId(), setPath({}, x.dataset.mfb, x.checked), 'update'); return}
   if (x.dataset.tf === 'size' && mp.tokSel) {write(`maps/${mapId()}/tokens/${mp.tokSel}`, {size: +x.value}, 'update'); return}
   if (x.dataset.tfb && mp.tokSel) {write(`maps/${mapId()}/tokens/${mp.tokSel}`, {[x.dataset.tfb]: x.checked}, 'update'); return}

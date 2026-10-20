@@ -91,9 +91,9 @@ python3 quadern.py
 | Linux, con el `.deb` | `~/.local/share/quadern-del-mestre` |
 | Windows portable, `.tar.gz` o `python3 quadern.py` | La misma carpeta del programa |
 
-Dentro está la carpeta `partides` (cada partida y sus imágenes) y el archivo `quadern.json` (jugadores y contraseña del máster). El botón **Carpeta de partidas** de la ventana la abre directamente.
+Dentro está la carpeta `partides` (cada partida, con sus imágenes y sonidos), la carpeta `copies` (las copias de seguridad automáticas) y el archivo `quadern.json` (jugadores y contraseña del máster). El botón **Carpeta de partidas** de la ventana la abre directamente.
 
-Para hacer una copia de seguridad, copia esa carpeta entera. Si quieres guardar los datos en otro sitio (por ejemplo, una carpeta sincronizada con la nube), arranca con `--dades CARPETA`.
+El Quadern hace copias de seguridad solo (mira el manual de usuario). Para tenerlas también fuera del ordenador, exporta las partidas desde la pestaña **Partidas** o copia esa carpeta entera. Si quieres guardar los datos en otro sitio (por ejemplo, una carpeta sincronizada con la nube), arranca con `--dades CARPETA`.
 
 ### Pasar las partidas de la versión 1.0
 
@@ -104,6 +104,8 @@ La versión 1.0 guardaba las partidas junto a `QuadernDelMestre.exe`. Si ahora u
 3. Vuelve a abrir el Quadern.
 
 Si sigues con la versión portable, solo tienes que copiar esos dos a la carpeta nueva.
+
+**Pasar una partida a otro ordenador:** en la pestaña **Partidas**, pulsa **Exportar** en el ordenador viejo e **Importar una partida** en el nuevo. El archivo `.zip` lleva la partida con las imágenes y la música.
 
 ## Opciones
 

@@ -3,8 +3,14 @@
  * Llicència GPL-3.0 o posterior.
  */
 let lanFirst = null, lanPoll = null, lanErrs = [], lanBannerT = null, lanLast = Date.now();
-function lanOk() {clearTimeout(lanBannerT); lanBannerT = null; if ($('#banner').dataset.conn) {delete $('#banner').dataset.conn; showBanner('')}}
-function lanTrouble() {if (!lanBannerT) lanBannerT = setTimeout(() => {$('#banner').dataset.conn = '1'; showBanner(t("S'ha perdut la connexió amb el servidor. Tornant a connectar…"))}, 5000)}
+/* Connexió: si es perd, una banda roja ho diu clarament; els canvis es guarden quan torna. */
+function connBanner() {$('#banner').dataset.conn = '1'; showBanner(pendingNet.size ? t("Sense connexió amb el servidor. Tornant a connectar… Els teus canvis es guardaran quan torne.") : t("S'ha perdut la connexió amb el servidor. Tornant a connectar…"), 'off')}
+function lanOk() {clearTimeout(lanBannerT); lanBannerT = null; if ($('#banner').dataset.conn && !pendingNet.size) {delete $('#banner').dataset.conn; showBanner(''); toast(t('Connexió recuperada.'))}}
+function lanTrouble() {if (!lanBannerT) lanBannerT = setTimeout(connBanner, 4000)}
+function netLost() {if ($('#banner').dataset.conn) connBanner(); else lanTrouble()}
+function netBack() {if ($('#banner').dataset.conn) lanOk()}
+// En tornar a l'app (el mòbil s'havia adormit), es reconnecta de seguida si fa estona que no arriba res
+document.addEventListener('visibilitychange', () => {if (document.visibilityState === 'visible' && S.token && !lanPoll && Date.now() - lanLast > 15000) {if (S.es) S.es.close(); lanConnect()}});
 function applySnapshot(d) {
   S.uid = d.me.uid; S.dm = !!d.me.dm;
   if (S.camp && d.campaign && d.campaign !== S.camp) {location.reload(); return false}
@@ -25,6 +31,7 @@ function lanConnect() {
   const es = new EventSource('api/events?t=' + encodeURIComponent(S.token)); S.es = es;
   es.addEventListener('snapshot', e => {lanLast = Date.now(); if (applySnapshot(JSON.parse(e.data))) lanOk()});
   es.addEventListener('ping', e => {lanLast = Date.now(); const d = JSON.parse(e.data || '{}'); if (d && d.map !== undefined) onPing(d)});
+  es.addEventListener('draw', e => {lanLast = Date.now(); const d = JSON.parse(e.data || '{}'); if (d && Array.isArray(d.pts)) onDraw(d)});
   es.addEventListener('campaign', () => {showBanner(t("S'ha obert una altra partida. Carregant…")); setTimeout(() => location.reload(), 500)});
   es.addEventListener('doc', e => {lanLast = Date.now(); const d = JSON.parse(e.data); if (d.data == null) mem.delete(d.path); else mem.set(d.path, d.data); memNotify(d.path)});
   es.onerror = () => {lanTrouble(); const now = Date.now(); lanErrs = lanErrs.filter(x => now - x < 60000); lanErrs.push(now); if (lanErrs.length >= 3) startPolling(); else if (es.readyState === 2) setTimeout(lanConnect, 3000)};
@@ -52,7 +59,7 @@ function joinRender() {
 function joinScreen() {return new Promise(resolve => {joinResolve = resolve; joinRender()})}
 function startSubs() {
   st.loaded = true; st.firstSync = true; renderAll(); setTimeout(() => {st.firstSync = false}, 1500);
-  if (dm() && lsGet('qm-seed') === '1' && !col('maps').length && !col('characters').length) {lsSet('qm-seed', ''); seedExample()}
+  const seed = lsGet('qm-seed'); if (dm() && seed && !col('maps').length && !col('characters').length) {lsSet('qm-seed', ''); seedExample(seed)}
 }
 async function boot() {
   applyStatic(); renderHeader();

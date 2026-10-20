@@ -38,15 +38,15 @@ Funciona a **Windows i Linux**. S'instal·la com qualsevol altre programa i les 
 | Secció | Què fa |
 |---|---|
 | **Mapa** | Imatge de fons (Dungeondraft, Inkarnate, un escaneig…) amb la quadrícula ajustable, o dibuixat a mà: terreny, parets, portes, portes secretes, finestres, sales i etiquetes. Fitxes amb la vida a l'anell; cada jugador mou les seues. **Regle** en metres i **àrees d'efecte** (esfera, con, línia i cub). |
-| **Boira de guerra** | El màster revela zones i els jugadors no reben res del que hi ha davall, ni les fitxes amagades. |
-| **Personatges** | Fitxes completes amb les regles de 2024: característiques, habilitats, salvacions, PG, atacs, conjurs amb espais, inventari, monedes, estats, descansos i retrat. Totes les tirades es fan des de la fitxa. |
-| **Combat** | Iniciativa, torns i rondes, dany i curació, estats i monstres amagats. Calcula la dificultat de l'encontre. Els jugadors veuen «Ferit» o «Malferit» en compte dels PG dels monstres. |
+| **Boira de guerra** | El màster revela zones a mà, o deixa que es revelen soles amb el que veuen els personatges (les parets, les portes tancades, la roca i els arbres tapen la vista). Els jugadors no reben res del que hi ha davall, ni les fitxes amagades. |
+| **Personatges** | Fitxes completes amb les regles de 2024: característiques, habilitats, salvacions, PG, atacs, conjurs amb espais, inventari, monedes, estats, descansos i retrat. Totes les tirades es fan des de la fitxa. **Pujar de nivell** guiat: PG, competència, espais de conjur i trets de classe. |
+| **Combat** | Iniciativa, torns i rondes, dany i curació, estats amb **durada en rondes** i monstres amagats. Tira sola la salvació de **concentració** quan cal. Calcula la dificultat de l'encontre. Els jugadors veuen «Ferit» o «Malferit» en compte dels PG dels monstres. |
 | **Compendi** | El SRD 5.2.1 amb la traducció oficial al castellà: 330 criatures, 339 conjurs, objectes màgics, estats, equip, classes i regles. Preparador d'encontres i monstres propis. |
 | **Diari** | Un diari de sessions que escriu tota la taula, i documents (cartes, pistes, imatges) que el màster ensenya quan vol. |
-| **Màster** | Generadors de noms, PNJ, tavernes, botí i encontres, taules aleatòries pròpies i notes secretes. |
-| **Partides** | Diverses partides guardades, una partida d'exemple i la contrasenya del màster. |
+| **Màster** | Generadors de noms, PNJ, tavernes, botí i encontres, taules aleatòries pròpies, notes secretes i **música i ambient** (pluja, tempesta, foguera, cova… i les teues pistes). |
+| **Partides** | Diverses partides guardades, **còpies de seguretat automàtiques**, **exportar i importar** partides en un `.zip`, dues partides d'exemple i la contrasenya del màster. |
 
-A més: **daus** compartits amb avantatge, desavantatge i tirades secretes, entrada amb **QR**, **mode fosc** i adaptat al **mòbil**. Tot el programa està en **valencià i castellà**, i cada jugador tria el seu idioma.
+A més: **daus** compartits amb avantatge, desavantatge i tirades secretes, un **llapis** per a dibuixar damunt del mapa, entrada amb **QR**, **mode fosc** i adaptat al **mòbil**. Si es perd la connexió, ho avisa i guarda els canvis quan torna. Tot el programa està en **valencià i castellà**, i cada jugador tria el seu idioma.
 
 ## Captures
 
@@ -105,7 +105,9 @@ quadern-del-mestre --idioma es             # la finestra en castellà (per defec
 | Linux, amb el `.deb` | `~/.local/share/quadern-del-mestre` |
 | Windows portable, `.tar.gz` o `python3 quadern.py` | La carpeta del programa |
 
-Cada partida es guarda a `partides/<nom>.json`, i les seues imatges a `partides/<nom>-fitxers/`. Els jugadors, les sessions i la contrasenya del màster van a `quadern.json`. Per a fer una còpia de seguretat, copia la carpeta sencera; el botó **Carpeta de partides** de la finestra l'obri directament. En desinstal·lar, les partides no s'esborren.
+Cada partida es guarda a `partides/<nom>.json`, i les seues imatges i sons a `partides/<nom>-fitxers/`. Els jugadors, les sessions i la contrasenya del màster van a `quadern.json`. El botó **Carpeta de partides** de la finestra obri la carpeta. En desinstal·lar, les partides no s'esborren.
+
+El Quadern fa **còpies de seguretat** soles a `copies/`: una cada vegada que s'obri una partida i una cada mitja hora mentre es juga (en guarda les 15 últimes). Es restauren des de **Partides → Còpies**. Per a passar una partida a un altre ordinador, **Exportar** i **Importar una partida**.
 
 ## Documentació
 
@@ -122,17 +124,18 @@ Només cal **Python 3.8 o més nou**, sense dependències. `quadern.py` es gener
 
 | Fitxer | Què hi ha |
 |---|---|
-| `src/servidor.py` | El servidor: permisos del màster, boira de guerra, imatges i on es guarden les dades |
+| `src/servidor.py` | El servidor: permisos del màster, boira de guerra i línia de visió, imatges i sons, còpies, exportar i importar |
 | `src/finestra.py` | La finestreta amb l'adreça, el QR i la contrasenya (Tk) |
 | `src/qr.py` | El generador de codis QR |
 | `src/srd/srd-es.json.gz` | El compendi SRD 5.2.1 en castellà |
 | `src/web/nucli.js`, `daus.js` | Utilitats, idioma, connexió, finestres i daus |
 | `src/web/mapa.js` | L'editor de mapes |
 | `src/web/fitxes.js`, `combat.js`, `compendi.js` | Fitxes, combat i compendi |
-| `src/web/diari.js`, `master.js`, `partides.js` | Diari i documents, pestanya del màster, partides |
+| `src/web/diari.js`, `master.js`, `so.js`, `partides.js` | Diari i documents, pestanya del màster, música i ambient, partides |
 | `src/web/dades.js` | Regles: habilitats, estats, classes, espais de conjur, PX, generadors |
 | `src/web/i18n.js` | Les traduccions al castellà (per a afegir un idioma, copia el bloc `es`) |
 | `docs/` | Els manuals en Markdown i les captures |
+| `tests/` | Les proves automàtiques del servidor |
 | `paquets/` | L'instal·lador de Windows (Inno Setup) i els fitxers del menú de Linux |
 | `eines/` | Comprovar traduccions, fer els manuals en PDF, els paquets de Linux i la web |
 
@@ -141,6 +144,7 @@ Després de canviar alguna cosa:
 ```bash
 python3 build.py                          # torna a generar quadern.py
 python3 eines/comprova-traduccions.py     # comprova que no falta cap traducció
+python3 tests/prova_servidor.py           # proves: permisos, boira, còpies, exportar i importar…
 python3 quadern.py                        # prova-ho
 ```
 
@@ -153,6 +157,8 @@ python3 eines/web.py _site                # genera la web
 ```
 
 ## Publicar una versió
+
+Cada canvi que es puja a `main` passa les proves a Windows i Linux ([`.github/workflows/proves.yml`](.github/workflows/proves.yml)).
 
 GitHub ho fa tot sol amb [`.github/workflows/publica.yml`](.github/workflows/publica.yml): prova el programa, fa l'instal·lador i el portable de Windows, el `.deb` i el `.tar.gz` de Linux i els manuals en PDF, i ho publica a [Releases](../../releases).
 
@@ -170,7 +176,7 @@ La [web](https://jossanmar9.github.io/quadern-del-mestre/) es publica sola amb [
 
 ## Col·laborar
 
-Les propostes de millora i les correccions són benvingudes. Si has trobat una errada o tens una idea, obri una [incidència](../../issues).
+Les propostes de millora i les correccions són benvingudes. Si has trobat una errada o tens una idea, obri una [incidència](../../issues/new/choose): hi ha un formulari per a errades i un altre per a propostes, en valencià i castellà.
 
 ## Ús d'intel·ligència artificial
 

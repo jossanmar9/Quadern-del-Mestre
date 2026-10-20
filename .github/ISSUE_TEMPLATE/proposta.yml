@@ -1,0 +1,35 @@
+name: "Proposta / Propuesta"
+description: "Una idea per a millorar el Quadern. / Una idea para mejorar el Quadern."
+title: "[Proposta] "
+labels: ["proposta"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Explica què t'agradaria poder fer a la taula. Pots escriure en valencià o en castellà.
+        Explica qué te gustaría poder hacer en la mesa. Puedes escribir en valenciano o en castellano.
+  - type: textarea
+    id: que
+    attributes:
+      label: "Què t'agradaria? / ¿Qué te gustaría?"
+    validations:
+      required: true
+  - type: textarea
+    id: perque
+    attributes:
+      label: "Per a què et serviria a la partida? / ¿Para qué te serviría en la partida?"
+      description: "Un exemple d'una situació de joc ajuda molt. / Un ejemplo de una situación de juego ayuda mucho."
+  - type: dropdown
+    id: part
+    attributes:
+      label: "Part del programa / Parte del programa"
+      options:
+        - "Mapa i boira / Mapa y niebla"
+        - "Fitxes / Fichas"
+        - "Combat / Combate"
+        - "Compendi / Compendio"
+        - "Diari i documents / Diario y documentos"
+        - "Pestanya del màster / Pestaña del máster"
+        - "Partides i còpies / Partidas y copias"
+        - "Instal·lació / Instalación"
+        - "Una altra / Otra"
