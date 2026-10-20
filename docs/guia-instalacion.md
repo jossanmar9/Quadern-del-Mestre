@@ -118,7 +118,7 @@ El Quadern acepta estas opciones al arrancarlo desde el terminal (`quadern-del-m
 | `--sense-finestra` | No abre la ventana: todo va al terminal, con el QR. Útil en un servidor sin pantalla. |
 | `--sense-navegador` | No abre el navegador al arrancar. |
 | `--sense-qr` | No muestra el QR en el terminal. |
-| `--idioma ca` | Muestra la ventana en valenciano (`es` para castellano). Por defecto, el del sistema. |
+| `--idioma ca` | Muestra la ventana en valenciano (`es` para castellano). Por defecto, en valenciano. |
 
 ## Si algo no funciona
 

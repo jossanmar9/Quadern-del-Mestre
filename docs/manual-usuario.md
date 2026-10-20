@@ -35,7 +35,7 @@ Abre **Quadern del Mestre** desde el menú Inicio (Windows) o desde el menú de 
 En la ventana encontrarás:
 
 - **La dirección para los demás**, por ejemplo `http://192.168.1.40:8767`, y el **código QR** que la lleva dentro.
-- **La contraseña del máster.** La primera vez se crea una al azar (como `drac-427`) y se recuerda. La puedes cambiar en la pestaña Partidas.
+- **La contraseña del máster.** La primera vez se crea una al azar con una palabra y un número (como `drac427`) y se recuerda. La puedes cambiar en la pestaña Partidas.
 - **La partida abierta.**
 - Los botones **Abrir en el navegador**, **Carpeta de partidas** (abre la carpeta donde se guarda todo) y **Detener**.
 

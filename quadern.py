@@ -18,7 +18,7 @@
 # Commons Reconeixement 4.0 Internacional (https://creativecommons.org/licenses/by/4.0/legalcode).
 # Projecte de fans no oficial, sense relació amb Wizards of the Coast.
 """
-Quadern del Mestre (versió 1.1) — servidor local per a portar partides de rol.
+Quadern del Mestre (versió 1.2) — servidor local per a portar partides de rol.
 
 Tot va en aquest únic fitxer: el servidor, la pàgina web i el compendi SRD 5.2.1.
 Un ordinador l'executa i la resta s'hi connecta des del navegador.
@@ -55,7 +55,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.1"
+VERSION = "1.2"
 FROZEN = getattr(sys, "frozen", False)          # executable de Windows fet amb PyInstaller
 DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent
 INSTALLAT = (DIR / "installat").exists()       # el posen l'instal·lador de Windows i el paquet .deb
@@ -81,8 +81,12 @@ def set_data_dir(path):
 set_data_dir(user_data_dir() if INSTALLAT else DIR)
 MAX_UPLOAD = 20 * 1024 * 1024
 IMG_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}
+# Paraules per a la contrasenya del màster (paraula + número, per exemple «drac427»):
+# curtes, sense accents ni apòstrofs, perquè s'escriguen bé des del mòbil.
 WORDS = ("drac", "mag", "elf", "nan", "orc", "runa", "espasa", "torre", "llop", "corb", "foc", "gel",
-         "lluna", "estel", "cripta", "bosc", "rei", "fada", "gegant", "tresor")
+         "lluna", "estel", "cripta", "bosc", "rei", "fada", "gegant", "tresor", "escut", "arc", "fletxa",
+         "destral", "pocio", "mapa", "clau", "porta", "castell", "pont", "riu", "muntanya", "cova", "trol",
+         "golem", "follet", "bruixa", "corona", "anell", "llibre", "vela", "daga", "martell", "llanca")
 
 lock = threading.RLock()
 state = {
@@ -200,6 +204,11 @@ def new_campaign(name):
     return cid
 
 
+def nova_contrasenya():
+    """Una contrasenya a l'atzar: una paraula i un número de tres xifres, per exemple «drac427»."""
+    return f"{secrets.choice(WORDS)}{secrets.randbelow(900) + 100}"
+
+
 def load(wanted=None, password=None):
     CAMP_DIR.mkdir(parents=True, exist_ok=True)
     if META.exists():
@@ -214,7 +223,7 @@ def load(wanted=None, password=None):
     if password:
         state["password"] = password
     if not state["password"]:
-        state["password"] = f"{secrets.choice(WORDS)}-{secrets.randbelow(900) + 100}"
+        state["password"] = nova_contrasenya()
     if wanted:
         state["active"] = None
         match = None
@@ -736,21 +745,6 @@ FINESTRA_TEXTOS = {
                   "Ciérralo, o arranca el Quadern con otro puerto: --port 9002",
     },
 }
-
-
-def idioma_sistema():
-    """«es» si el sistema està en castellà; si no, valencià."""
-    if os.name == "nt":
-        try:
-            import ctypes
-            return "es" if ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF == 0x0A else "ca"
-        except Exception:  # noqa: BLE001
-            pass
-    for var in ("LC_ALL", "LC_MESSAGES", "LANGUAGE", "LANG"):
-        val = os.environ.get(var, "")
-        if val:
-            return "es" if val.lower().startswith("es") else "ca"
-    return "ca"
 
 
 def hi_ha_finestra():
@@ -1295,12 +1289,12 @@ def main():
     ap.add_argument("--sense-finestra", action="store_true", help="no obri la finestra: només la terminal")
     ap.add_argument("--sense-navegador", action="store_true", help="no obri el navegador en arrancar")
     ap.add_argument("--sense-qr", action="store_true", help="no mostra el codi QR a la terminal")
-    ap.add_argument("--idioma", choices=("ca", "es"), help="idioma de la finestra (per defecte, el del sistema)")
+    ap.add_argument("--idioma", choices=("ca", "es"), help="idioma de la finestra (per defecte, valencià)")
     a = ap.parse_args()
     if a.dades.strip():
         set_data_dir(a.dades.strip())
     amb_finestra = not a.sense_finestra and hi_ha_finestra()
-    idioma = a.idioma or idioma_sistema()
+    idioma = a.idioma or "ca"
     state["port"] = a.port
     try:
         srv = Server(("0.0.0.0", a.port), Handler)
@@ -1353,7 +1347,7 @@ def main():
 
 # ---------------------------------------------------------------- pàgina web i compendi SRD (gzip + base64)
 PAGE_BYTES = gzip.decompress(base64.b64decode("""
-H4sIAHk61moC/5ybx47zWpee576K4zNl/2BOdh8DEnPOccYo5pyv3vzabgMGPHIBBYqqErW5udd6n6fE+vf/mo/Zdk/FX9XWd//j
+H4sIAMIU12oC/5ybx47zWpee576K4zNl/2BOdh8DEnPOccYo5pyv3vzabgMGPHIBBYqqErW5udd6n6fE+vf/mo/Zdk/FX9XWd//j
 v/z7n81fXTL8/vk7S/7+80SR5O+mL7bkr6xKlrXY/vl738p/UX//59ND0hf//H3UxTmNy/b3X9k4bMXw/tpZ51v1T14cdVb86z92
 /q0e6q1Oun+tWdIV/8D/9p+v+ldZb/9k41Esfw7b1UP711J0//xdvwf7+68/I3wf98mvAKfh9/df1VKU//ydJ1vy3/7Ps/89TdaC
 wP6t9r+GfUKK8Bs/75fueBXn/d5H3J/d74f5RO+WmZNQLN4HTdV2nOXbGLIjaRLbuY/2/UCiZmbkaU5U+NIpflVPMlw/qVaT8tZc

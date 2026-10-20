@@ -92,7 +92,7 @@ quadern-del-mestre --port 9002             # un altre port (el normal és el 876
 quadern-del-mestre --partida "La cripta"   # obri (o crea) eixa partida
 quadern-del-mestre --dades ~/Partides      # guarda les partides en una altra carpeta
 quadern-del-mestre --sense-finestra        # sense finestra: tot al terminal, amb el QR
-quadern-del-mestre --idioma es             # la finestra en castellà (per defecte, el del sistema)
+quadern-del-mestre --idioma es             # la finestra en castellà (per defecte, en valencià)
 ```
 
 (A Windows, `QuadernDelMestre.exe`; amb el `.tar.gz`, `./quadern-del-mestre.sh`; sense instal·lar, `python3 quadern.py`.)

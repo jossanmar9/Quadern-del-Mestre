@@ -18,7 +18,7 @@
 # Commons Reconeixement 4.0 Internacional (https://creativecommons.org/licenses/by/4.0/legalcode).
 # Projecte de fans no oficial, sense relació amb Wizards of the Coast.
 """
-Quadern del Mestre (versió 1.1) — servidor local per a portar partides de rol.
+Quadern del Mestre (versió 1.2) — servidor local per a portar partides de rol.
 
 Tot va en aquest únic fitxer: el servidor, la pàgina web i el compendi SRD 5.2.1.
 Un ordinador l'executa i la resta s'hi connecta des del navegador.
@@ -55,7 +55,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = "1.1"
+VERSION = "1.2"
 FROZEN = getattr(sys, "frozen", False)          # executable de Windows fet amb PyInstaller
 DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent
 INSTALLAT = (DIR / "installat").exists()       # el posen l'instal·lador de Windows i el paquet .deb
@@ -81,8 +81,12 @@ def set_data_dir(path):
 set_data_dir(user_data_dir() if INSTALLAT else DIR)
 MAX_UPLOAD = 20 * 1024 * 1024
 IMG_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}
+# Paraules per a la contrasenya del màster (paraula + número, per exemple «drac427»):
+# curtes, sense accents ni apòstrofs, perquè s'escriguen bé des del mòbil.
 WORDS = ("drac", "mag", "elf", "nan", "orc", "runa", "espasa", "torre", "llop", "corb", "foc", "gel",
-         "lluna", "estel", "cripta", "bosc", "rei", "fada", "gegant", "tresor")
+         "lluna", "estel", "cripta", "bosc", "rei", "fada", "gegant", "tresor", "escut", "arc", "fletxa",
+         "destral", "pocio", "mapa", "clau", "porta", "castell", "pont", "riu", "muntanya", "cova", "trol",
+         "golem", "follet", "bruixa", "corona", "anell", "llibre", "vela", "daga", "martell", "llanca")
 
 lock = threading.RLock()
 state = {
@@ -200,6 +204,11 @@ def new_campaign(name):
     return cid
 
 
+def nova_contrasenya():
+    """Una contrasenya a l'atzar: una paraula i un número de tres xifres, per exemple «drac427»."""
+    return f"{secrets.choice(WORDS)}{secrets.randbelow(900) + 100}"
+
+
 def load(wanted=None, password=None):
     CAMP_DIR.mkdir(parents=True, exist_ok=True)
     if META.exists():
@@ -214,7 +223,7 @@ def load(wanted=None, password=None):
     if password:
         state["password"] = password
     if not state["password"]:
-        state["password"] = f"{secrets.choice(WORDS)}-{secrets.randbelow(900) + 100}"
+        state["password"] = nova_contrasenya()
     if wanted:
         state["active"] = None
         match = None
@@ -837,12 +846,12 @@ def main():
     ap.add_argument("--sense-finestra", action="store_true", help="no obri la finestra: només la terminal")
     ap.add_argument("--sense-navegador", action="store_true", help="no obri el navegador en arrancar")
     ap.add_argument("--sense-qr", action="store_true", help="no mostra el codi QR a la terminal")
-    ap.add_argument("--idioma", choices=("ca", "es"), help="idioma de la finestra (per defecte, el del sistema)")
+    ap.add_argument("--idioma", choices=("ca", "es"), help="idioma de la finestra (per defecte, valencià)")
     a = ap.parse_args()
     if a.dades.strip():
         set_data_dir(a.dades.strip())
     amb_finestra = not a.sense_finestra and hi_ha_finestra()
-    idioma = a.idioma or idioma_sistema()
+    idioma = a.idioma or "ca"
     state["port"] = a.port
     try:
         srv = Server(("0.0.0.0", a.port), Handler)

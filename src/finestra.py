@@ -46,21 +46,6 @@ FINESTRA_TEXTOS = {
 }
 
 
-def idioma_sistema():
-    """«es» si el sistema està en castellà; si no, valencià."""
-    if os.name == "nt":
-        try:
-            import ctypes
-            return "es" if ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF == 0x0A else "ca"
-        except Exception:  # noqa: BLE001
-            pass
-    for var in ("LC_ALL", "LC_MESSAGES", "LANGUAGE", "LANG"):
-        val = os.environ.get(var, "")
-        if val:
-            return "es" if val.lower().startswith("es") else "ca"
-    return "ca"
-
-
 def hi_ha_finestra():
     """Hi ha tkinter i una pantalla on mostrar la finestra?"""
     if os.name != "nt" and sys.platform != "darwin" and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
